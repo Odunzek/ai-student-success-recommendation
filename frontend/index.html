@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Success Platform</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="logo">SSP</span>
+            <span>Student Success Platform</span>
+        </div>
+        <div class="nav-status">
+            <span id="api-status" class="status-badge status-loading">Connecting...</span>
+        </div>
+    </nav>
+
+    <main class="container">
+        <!-- Dashboard Overview -->
+        <section id="dashboard" class="section">
+            <h2>Dashboard Overview</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="total-students">-</div>
+                    <div class="stat-label">Total Students</div>
+                </div>
+                <div class="stat-card stat-danger">
+                    <div class="stat-value" id="at-risk-count">-</div>
+                    <div class="stat-label">At Risk</div>
+                </div>
+                <div class="stat-card stat-success">
+                    <div class="stat-value" id="safe-count">-</div>
+                    <div class="stat-label">On Track</div>
+                </div>
+                <div class="stat-card stat-warning">
+                    <div class="stat-value" id="risk-percentage">-</div>
+                    <div class="stat-label">Risk Rate</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="predict">Risk Prediction</button>
+            <button class="tab-btn" data-tab="intervention">Interventions</button>
+            <button class="tab-btn" data-tab="students">Student List</button>
+            <button class="tab-btn" data-tab="data">Data</button>
+            <button class="tab-btn" data-tab="chat">AI Assistant</button>
+        </div>
+
+        <!-- Prediction Tab -->
+        <section id="predict-tab" class="tab-content active">
+            <div class="card">
+                <h3>Predict Student Risk</h3>
+                <p class="card-description">Enter student metrics to predict their risk level and see contributing factors.</p>
+
+                <form id="predict-form" class="form-grid">
+                    <div class="form-group">
+                        <label for="avg_score">Average Score (%)</label>
+                        <input type="number" id="avg_score" name="avg_score" min="0" max="100" placeholder="0-100" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="completion_rate">Completion Rate (0-1)</label>
+                        <input type="number" id="completion_rate" name="completion_rate" min="0" max="1" step="0.01" placeholder="0.0-1.0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="total_clicks">Total VLE Clicks</label>
+                        <input type="number" id="total_clicks" name="total_clicks" min="0" placeholder="e.g. 500" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="studied_credits">Studied Credits</label>
+                        <input type="number" id="studied_credits" name="studied_credits" min="0" placeholder="e.g. 60" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="num_of_prev_attempts">Previous Attempts</label>
+                        <input type="number" id="num_of_prev_attempts" name="num_of_prev_attempts" min="0" placeholder="0+" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Module Enrolled</label>
+                        <select id="module_select">
+                            <option value="">None selected</option>
+                            <option value="BBB">Module BBB</option>
+                            <option value="CCC">Module CCC</option>
+                            <option value="DDD">Module DDD</option>
+                            <option value="EEE">Module EEE</option>
+                            <option value="FFF">Module FFF</option>
+                            <option value="GGG">Module GGG</option>
+                        </select>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Predict Risk</button>
+                    </div>
+                </form>
+
+                <div id="prediction-result" class="result-panel hidden">
+                    <div class="result-header">
+                        <h4>Prediction Result</h4>
+                        <span id="risk-badge" class="risk-badge">-</span>
+                    </div>
+                    <div class="result-score">
+                        <div class="score-circle" id="score-circle">
+                            <span id="risk-score">-</span>
+                        </div>
+                        <div class="score-label">Risk Score</div>
+                    </div>
+                    <div id="shap-factors" class="factors-list">
+                        <h5>Contributing Factors</h5>
+                        <div id="factors-container"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Intervention Tab -->
+        <section id="intervention-tab" class="tab-content">
+            <div class="card">
+                <h3>Generate Interventions</h3>
+                <p class="card-description">Get personalized intervention recommendations based on student risk factors.</p>
+
+                <form id="intervention-form" class="form-grid">
+                    <div class="form-group">
+                        <label for="int_risk_score">Risk Score (0-100)</label>
+                        <input type="number" id="int_risk_score" name="risk_score" min="0" max="100" placeholder="0-100" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="int_avg_score">Average Score (%)</label>
+                        <input type="number" id="int_avg_score" name="avg_score" min="0" max="100" placeholder="0-100" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="int_completion_rate">Completion Rate (0-1)</label>
+                        <input type="number" id="int_completion_rate" name="completion_rate" min="0" max="1" step="0.01" placeholder="0.0-1.0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="int_total_clicks">Total VLE Clicks</label>
+                        <input type="number" id="int_total_clicks" name="total_clicks" min="0" placeholder="e.g. 150" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="student_name">Student Name (optional)</label>
+                        <input type="text" id="student_name" name="student_name" placeholder="For personalization">
+                    </div>
+                    <div class="llm-toggle-container">
+                        <span class="llm-toggle-label">AI Personalization</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="use_llm" name="use_llm" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span class="llm-status" id="llm-status">ON</span>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Generate Interventions</button>
+                    </div>
+                </form>
+
+                <div id="intervention-result" class="result-panel hidden">
+                    <div class="result-header">
+                        <h4>Intervention Plan</h4>
+                        <span id="int-risk-badge" class="risk-badge">-</span>
+                        <span id="llm-badge" class="llm-badge hidden">AI Enhanced</span>
+                    </div>
+                    <div id="intervention-summary" class="intervention-summary"></div>
+                    <div id="interventions-list" class="interventions-list"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Students Tab -->
+        <section id="students-tab" class="tab-content">
+            <div class="card">
+                <h3>Student Directory</h3>
+                <div class="table-controls">
+                    <input type="text" id="student-search" placeholder="Search by ID..." class="search-input">
+                    <button id="load-students" class="btn btn-secondary">Load Students</button>
+                </div>
+                <div class="table-container">
+                    <table id="students-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Avg Score</th>
+                                <th>Completion</th>
+                                <th>Clicks</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="students-tbody">
+                            <tr>
+                                <td colspan="6" class="loading-cell">Click "Load Students" to view data</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="pagination">
+                    <button id="prev-page" class="btn btn-small" disabled>Previous</button>
+                    <span id="page-info">Page 1</span>
+                    <button id="next-page" class="btn btn-small">Next</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Data Tab -->
+        <section id="data-tab" class="tab-content">
+            <div class="data-layout">
+                <!-- Left Column: Upload -->
+                <div class="data-upload-card">
+                    <div class="upload-header">
+                        <div class="upload-icon-wrapper">
+                            <svg class="upload-header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3>Upload Data</h3>
+                            <p>Import student records for analysis</p>
+                        </div>
+                    </div>
+
+                    <div class="dropzone" id="dropzone">
+                        <div class="dropzone-content">
+                            <div class="dropzone-icon-circle">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                    <line x1="12" y1="18" x2="12" y2="12"></line>
+                                    <line x1="9" y1="15" x2="15" y2="15"></line>
+                                </svg>
+                            </div>
+                            <p class="dropzone-text">Drop your file here</p>
+                            <p class="dropzone-hint">or <span class="dropzone-link">browse</span> to select</p>
+                            <p class="dropzone-formats">CSV or ZIP files supported</p>
+                        </div>
+                        <input type="file" id="file-input" accept=".csv,.zip" hidden>
+                    </div>
+
+                    <!-- Selected File Preview -->
+                    <div id="selected-file" class="selected-file hidden">
+                        <div class="selected-file-info">
+                            <svg class="file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                            </svg>
+                            <div class="file-details">
+                                <span class="file-name"></span>
+                                <span class="file-size"></span>
+                            </div>
+                        </div>
+                        <button class="file-remove" title="Remove file">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Upload Progress -->
+                    <div id="upload-progress" class="upload-progress hidden">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                        <span class="progress-text" id="progress-text">Processing...</span>
+                    </div>
+
+                    <!-- Upload Result -->
+                    <div id="upload-result" class="upload-result hidden">
+                        <div class="upload-result-icon"></div>
+                        <p class="upload-result-message"></p>
+                    </div>
+
+                    <button id="upload-btn" class="btn btn-primary btn-upload" disabled>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        Upload & Process
+                    </button>
+                </div>
+
+                <!-- Right Column: Current Data -->
+                <div class="data-info-card">
+                    <div class="data-info-header">
+                        <h3>Current Dataset</h3>
+                        <span class="data-status-badge" id="data-load-status">Loading...</span>
+                    </div>
+
+                    <div class="data-stats">
+                        <div class="data-stat-item">
+                            <div class="data-stat-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="9" cy="7" r="4"></circle>
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                </svg>
+                            </div>
+                            <div class="data-stat-content">
+                                <span class="data-stat-value" id="data-record-count">-</span>
+                                <span class="data-stat-label">Total Records</span>
+                            </div>
+                        </div>
+
+                        <div class="data-stat-item">
+                            <div class="data-stat-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                </svg>
+                            </div>
+                            <div class="data-stat-content">
+                                <span class="data-stat-value" id="data-source">-</span>
+                                <span class="data-stat-label">Data Source</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="data-actions">
+                        <button id="clear-data-btn" class="btn btn-secondary btn-reset">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="1 4 1 10 7 10"></polyline>
+                                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                            </svg>
+                            Reset to Default
+                        </button>
+                    </div>
+
+                    <div class="data-help">
+                        <h4>Supported Formats</h4>
+                        <div class="format-list">
+                            <div class="format-item">
+                                <span class="format-badge">CSV</span>
+                                <span class="format-desc">Pre-processed data with model features</span>
+                            </div>
+                            <div class="format-item">
+                                <span class="format-badge">ZIP</span>
+                                <span class="format-desc">OULAD dataset (auto-transformed)</span>
+                            </div>
+                        </div>
+
+                        <details class="feature-details">
+                            <summary>Required columns for CSV</summary>
+                            <div class="feature-tags">
+                                <span class="feature-tag">num_of_prev_attempts</span>
+                                <span class="feature-tag">studied_credits</span>
+                                <span class="feature-tag">avg_score</span>
+                                <span class="feature-tag">total_clicks</span>
+                                <span class="feature-tag">completion_rate</span>
+                                <span class="feature-tag">module_BBB</span>
+                                <span class="feature-tag">module_CCC</span>
+                                <span class="feature-tag">module_DDD</span>
+                                <span class="feature-tag">module_EEE</span>
+                                <span class="feature-tag">module_FFF</span>
+                                <span class="feature-tag">module_GGG</span>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Chat Tab -->
+        <section id="chat-tab" class="tab-content">
+            <div class="card chat-card">
+                <div class="chat-header">
+                    <h3>AI Assistant</h3>
+                    <span id="llm-status-indicator" class="llm-status-indicator status-loading">Checking...</span>
+                </div>
+                <div class="chat-messages" id="chat-messages">
+                    <div class="chat-message assistant">
+                        <div class="message-content">
+                            Hello! How can I help you today?
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-input-container">
+                    <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off">
+                    <button id="chat-send" class="btn btn-primary">Send</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Student Detail Modal -->
+        <div id="student-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Student Details</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div id="student-detail" class="modal-body"></div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>Student Success Platform - AI-Powered Early Intervention System</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
