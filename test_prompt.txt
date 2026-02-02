@@ -1,0 +1,26 @@
+
+
+# Create the file
+@"
+You are an academic intervention advisor AI.
+
+STUDENT PROFILE:
+- Risk Score: 85%
+- Course: Physics
+- Completion Rate: 35% (only 3 of 9 assignments submitted)
+- Average Score: 45%
+- Engagement: 150 clicks (low)
+
+RISK FACTORS (from ML model):
+1. completion_rate: Very low (35%)
+2. avg_score: Below passing (45%)
+3. total_clicks: Low engagement
+
+AVAILABLE RESOURCES:
+- Academic Success Center
+- STEM Tutoring
+- Study Groups
+- Advisor Meetings
+
+TASK: Generate 2-3 prioritized intervention recommendations with rationale.
+"@ | Out-File -FilePath test_prompt.txt
