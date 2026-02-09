@@ -14,13 +14,13 @@ export function ChatMessage({ message }: ChatMessageProps) {
       <div
         className={cn(
           'flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center',
-          isUser ? 'bg-primary' : 'bg-gray-200'
+          isUser ? 'bg-primary' : 'bg-surface-200 dark:bg-surface-700'
         )}
       >
         {isUser ? (
           <User className="h-4 w-4 text-white" />
         ) : (
-          <Bot className="h-4 w-4 text-gray-600" />
+          <Bot className="h-4 w-4 text-surface-600 dark:text-surface-400" />
         )}
       </div>
 
@@ -29,14 +29,14 @@ export function ChatMessage({ message }: ChatMessageProps) {
           'max-w-[80%] rounded-xl px-4 py-2',
           isUser
             ? 'bg-primary text-white rounded-br-sm'
-            : 'bg-gray-100 text-gray-900 rounded-bl-sm'
+            : 'bg-surface-100 dark:bg-surface-800 text-surface-900 dark:text-white rounded-bl-sm'
         )}
       >
         <p className="text-sm whitespace-pre-wrap">{message.content}</p>
         <p
           className={cn(
             'text-xs mt-1',
-            isUser ? 'text-primary-light' : 'text-gray-400'
+            isUser ? 'text-primary-200' : 'text-surface-400 dark:text-surface-500'
           )}
         >
           {new Date(message.timestamp).toLocaleTimeString([], {

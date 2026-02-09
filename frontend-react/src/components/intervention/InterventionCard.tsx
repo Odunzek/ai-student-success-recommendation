@@ -1,6 +1,5 @@
-import { Target } from 'lucide-react'
+import { Target, CheckCircle2 } from 'lucide-react'
 import { Badge } from '../ui/Badge'
-import { cn } from '../../lib/utils'
 import type { Intervention } from '../../types/intervention'
 
 interface InterventionCardProps {
@@ -12,33 +11,35 @@ export function InterventionCard({ intervention }: InterventionCardProps) {
     low: 'success',
     medium: 'warning',
     high: 'danger',
+    critical: 'danger',
   } as const
 
   return (
-    <div className="border border-gray-200 rounded-lg p-4 hover:border-primary/50 transition-colors">
+    <div className="border border-surface-200 dark:border-surface-700 rounded-lg p-4 hover:border-primary/50 transition-colors">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
             <Target className="h-4 w-4 text-primary" />
-            <h4 className="font-medium text-gray-900">{intervention.title}</h4>
+            <h4 className="font-medium text-surface-900 dark:text-white">{intervention.title}</h4>
           </div>
-          <p className="text-sm text-gray-600 mb-3">{intervention.description}</p>
-          <div className="flex items-center gap-2">
-            <Badge variant={priorityVariant[intervention.priority]}>
+          <p className="text-sm text-surface-600 dark:text-surface-400 mb-3">{intervention.description}</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge variant={priorityVariant[intervention.priority] ?? 'default'}>
               {intervention.priority} priority
             </Badge>
-            <Badge variant="default">{intervention.category}</Badge>
+            <Badge variant="default">{intervention.type}</Badge>
           </div>
-        </div>
-        <div className="text-right">
-          <div className="text-sm text-gray-500 mb-1">Est. Impact</div>
-          <div className={cn(
-            'text-lg font-semibold',
-            intervention.estimated_impact >= 0.7 ? 'text-success' :
-            intervention.estimated_impact >= 0.4 ? 'text-warning' : 'text-gray-600'
-          )}>
-            {(intervention.estimated_impact * 100).toFixed(0)}%
-          </div>
+
+          {intervention.actions.length > 0 && (
+            <ul className="mt-3 space-y-1">
+              {intervention.actions.map((action, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-surface-600 dark:text-surface-400">
+                  <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-primary" />
+                  <span>{action}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </div>

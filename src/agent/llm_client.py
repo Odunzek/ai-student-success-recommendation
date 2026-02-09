@@ -3,6 +3,7 @@
 import httpx
 
 from src.config import get_settings
+from src.api.routes.settings import get_current_model
 
 
 class OllamaClient:
@@ -11,8 +12,12 @@ class OllamaClient:
     def __init__(self):
         self.settings = get_settings()
         self.base_url = self.settings.ollama_base_url
-        self.model = self.settings.ollama_model
         self.timeout = self.settings.llm_timeout
+
+    @property
+    def model(self) -> str:
+        """Get current model, respecting runtime override."""
+        return get_current_model()
 
     async def generate(
         self,

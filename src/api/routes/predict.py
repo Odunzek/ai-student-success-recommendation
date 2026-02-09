@@ -1,5 +1,7 @@
 """Prediction endpoint routes."""
 
+import logging
+
 from fastapi import APIRouter, HTTPException, Query
 
 from src.api.schemas.student import StudentFeatures
@@ -7,6 +9,8 @@ from src.api.schemas.prediction import PredictionResponse, PredictionWithExplana
 from src.models.predictor import get_predictor
 from src.models.explainer import get_explainer
 from src.etl.loader import get_data_loader
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/predict", tags=["Prediction"])
 
@@ -121,6 +125,7 @@ async def batch_predict():
     try:
         students = loader.get_all_students(limit=10000)
         results = {"high": 0, "medium": 0, "low": 0}
+        errors = 0
 
         for student in students:
             try:
@@ -140,11 +145,16 @@ async def batch_predict():
                 result = predictor.predict(features.model_dump())
                 risk_level = result.get("risk_level", "low")
                 results[risk_level] = results.get(risk_level, 0) + 1
-            except Exception:
-                continue
+            except Exception as e:
+                errors += 1
+                logger.warning(
+                    f"Batch prediction failed for student {student.get('student_id', 'unknown')}: {e}"
+                )
 
         return {
             "processed": len(students),
+            "successful": len(students) - errors,
+            "errors": errors,
             "high_risk": results["high"],
             "medium_risk": results["medium"],
             "low_risk": results["low"],

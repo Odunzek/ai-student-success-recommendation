@@ -3,16 +3,10 @@ import { StatCard } from '../components/dashboard/StatCard'
 import { RiskDistribution } from '../components/prediction/RiskDistribution'
 import { StudentLookup } from '../components/prediction/StudentLookup'
 import { useDashboardStats } from '../api/hooks/useDashboard'
-import { useBatchPrediction } from '../api/hooks/usePrediction'
 import { formatPercentage } from '../lib/utils'
 
 export function PredictionTab() {
   const { data: stats } = useDashboardStats()
-  const batchPrediction = useBatchPrediction()
-
-  const handleRunBatch = () => {
-    batchPrediction.mutate()
-  }
 
   return (
     <div className="space-y-6">
@@ -47,11 +41,7 @@ export function PredictionTab() {
       {/* Two Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left: Risk Distribution */}
-        <RiskDistribution
-          stats={stats}
-          onRunBatch={handleRunBatch}
-          isRunningBatch={batchPrediction.isPending}
-        />
+        <RiskDistribution stats={stats} />
 
         {/* Right: Student Lookup */}
         <StudentLookup />

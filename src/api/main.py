@@ -10,6 +10,7 @@ from src.models.predictor import get_predictor
 from src.models.explainer import get_explainer
 from src.etl.loader import get_data_loader
 from src.api.routes import predict, intervention, students, dashboard, chat, upload
+from src.api.routes import settings as settings_routes
 
 
 @asynccontextmanager
@@ -30,8 +31,19 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[WARN] Could not load SHAP explainer: {e}")
 
-    # Don't auto-load student data - user will upload via /upload endpoint
-    print("[INFO] No data auto-loaded. Upload CSV via /api/v1/upload/csv")
+    # Check for previously uploaded data and auto-load if exists
+    loader = get_data_loader()
+    upload_path = settings.project_root / "data" / "uploads" / "uploaded_data.csv"
+
+    if upload_path.exists():
+        try:
+            loader.load(upload_path)
+            print(f"[OK] Restored previously uploaded data: {len(loader.data)} records")
+        except Exception as e:
+            print(f"[WARN] Could not load previous upload: {e}")
+            print("[INFO] Upload CSV via /api/v1/upload/csv")
+    else:
+        print("[INFO] No data loaded. Upload CSV via /api/v1/upload/csv")
 
     yield
 
@@ -66,6 +78,7 @@ def create_app() -> FastAPI:
     app.include_router(dashboard.router, prefix=settings.api_prefix)
     app.include_router(chat.router, prefix=settings.api_prefix)
     app.include_router(upload.router, prefix=settings.api_prefix)
+    app.include_router(settings_routes.router, prefix=settings.api_prefix)
 
     @app.get("/", tags=["Health"])
     async def root():

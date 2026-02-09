@@ -167,8 +167,9 @@ export function StudentTable({
   )
 }
 
-function GradePill({ label, value }: { label: string; value: number }) {
-  const getGradeColor = (grade: number) => {
+function GradePill({ label, value }: { label: string; value: number | undefined }) {
+  const getGradeColor = (grade: number | undefined) => {
+    if (grade === undefined) return 'bg-surface-100 text-surface-500 dark:bg-surface-800 dark:text-surface-400'
     if (grade >= 15) return 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400'
     if (grade >= 10) return 'bg-warning-100 text-warning-700 dark:bg-warning-900/30 dark:text-warning-400'
     return 'bg-danger-100 text-danger-700 dark:bg-danger-900/30 dark:text-danger-400'
@@ -179,7 +180,7 @@ function GradePill({ label, value }: { label: string; value: number }) {
       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium ${getGradeColor(value)}`}
     >
       <span className="opacity-70">{label}:</span>
-      <span>{value}</span>
+      <span>{value ?? '-'}</span>
     </span>
   )
 }

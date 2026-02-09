@@ -1,23 +1,26 @@
 export interface InterventionInput {
-  student_id?: string
-  risk_level: 'low' | 'medium' | 'high'
-  risk_factors: string[]
+  risk_score: number          // 0-100
+  completion_rate?: number    // 0-1
+  avg_score?: number          // 0-100
+  total_clicks?: number
+  studied_credits?: number
+  num_of_prev_attempts?: number
+  student_name?: string
+  module_name?: string
   use_llm?: boolean
 }
 
 export interface Intervention {
-  id: string
+  type: string                // 'academic' | 'engagement' | 'support' | 'urgent'
+  priority: 'low' | 'medium' | 'high' | 'critical'
   title: string
   description: string
-  priority: 'low' | 'medium' | 'high'
-  category: string
-  estimated_impact: number
+  actions: string[]
 }
 
 export interface InterventionResult {
-  student_id?: string
   risk_level: string
   interventions: Intervention[]
-  generated_by: 'rules' | 'llm'
-  summary?: string
+  summary: string
+  llm_enhanced: boolean
 }

@@ -23,9 +23,16 @@ export function useUpload() {
       return api.postForm<UploadResponse>('/upload/csv', formData)
     },
     onSuccess: () => {
+      // Invalidate all related queries to trigger immediate refetch
       queryClient.invalidateQueries({ queryKey: ['upload', 'status'] })
       queryClient.invalidateQueries({ queryKey: ['students'] })
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      // Explicitly invalidate all dashboard query keys
+      queryClient.invalidateQueries({ queryKey: ['dashboard', 'stats'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard', 'risk-summary'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard', 'trend'] })
+      // Force immediate refetch
+      queryClient.refetchQueries({ queryKey: ['dashboard'] })
+      queryClient.refetchQueries({ queryKey: ['upload', 'status'] })
     },
   })
 }
@@ -35,7 +42,8 @@ export function useUploadStatus() {
     queryKey: ['upload', 'status'],
     queryFn: () => api.get<UploadStatus>('/upload/status'),
     retry: false,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
+    staleTime: 30 * 1000, // 30 seconds - shorter for upload status
   })
 }
 
@@ -45,9 +53,13 @@ export function useResetData() {
   return useMutation({
     mutationFn: () => api.delete<{ message: string }>('/upload/data'),
     onSuccess: () => {
+      // Invalidate and refetch all data after reset
       queryClient.invalidateQueries({ queryKey: ['upload', 'status'] })
       queryClient.invalidateQueries({ queryKey: ['students'] })
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard', 'stats'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard', 'risk-summary'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard', 'trend'] })
+      queryClient.refetchQueries({ queryKey: ['upload', 'status'] })
     },
   })
 }

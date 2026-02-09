@@ -11,6 +11,8 @@ export function usePrediction() {
 
 export interface BatchPredictionResult {
   processed: number
+  successful: number
+  errors: number
   high_risk: number
   medium_risk: number
   low_risk: number

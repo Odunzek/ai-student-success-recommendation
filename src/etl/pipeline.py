@@ -402,9 +402,13 @@ def process_uploaded_file(
         if "student_id" not in df.columns:
             df["student_id"] = df.index.astype(str)
 
+        # Track which columns are being defaulted
+        defaulted_columns = []
+
         # Add missing features with defaults
         for feat in REQUIRED_FEATURES:
             if feat not in df.columns:
+                defaulted_columns.append(feat)
                 if feat.startswith("module_"):
                     df[feat] = 0
                 elif feat == "completion_rate":
@@ -414,4 +418,7 @@ def process_uploaded_file(
                 else:
                     df[feat] = 0
 
+        # Return format string with info about defaults
+        if defaulted_columns:
+            return df, f"unknown_with_defaults:{','.join(defaulted_columns)}"
         return df, "unknown_with_defaults"

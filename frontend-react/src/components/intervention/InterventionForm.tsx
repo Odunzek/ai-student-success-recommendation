@@ -2,16 +2,20 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Input } from '../ui/Input'
-import { Select } from '../ui/Select'
 import { Button } from '../ui/Button'
 import { Toggle } from '../ui/Toggle'
 import { Card, CardHeader, CardTitle, CardDescription } from '../ui/Card'
 import type { InterventionInput } from '../../types/intervention'
 
 const interventionSchema = z.object({
-  student_id: z.string().optional(),
-  risk_level: z.enum(['low', 'medium', 'high']),
-  risk_factors: z.array(z.string()).min(1, 'Select at least one risk factor'),
+  risk_score: z.coerce.number().min(0).max(100),
+  completion_rate: z.coerce.number().min(0).max(1).optional(),
+  avg_score: z.coerce.number().min(0).max(100).optional(),
+  total_clicks: z.coerce.number().min(0).optional(),
+  studied_credits: z.coerce.number().min(0).optional(),
+  num_of_prev_attempts: z.coerce.number().min(0).optional(),
+  student_name: z.string().optional(),
+  module_name: z.string().optional(),
 })
 
 interface InterventionFormProps {
@@ -21,37 +25,20 @@ interface InterventionFormProps {
   onToggleLlm: (value: boolean) => void
 }
 
-const riskFactorOptions = [
-  { value: 'low_grades', label: 'Low Grades' },
-  { value: 'high_absences', label: 'High Absences' },
-  { value: 'past_failures', label: 'Past Failures' },
-  { value: 'low_study_time', label: 'Low Study Time' },
-  { value: 'lack_support', label: 'Lack of Support' },
-  { value: 'family_issues', label: 'Family Issues' },
-  { value: 'health_concerns', label: 'Health Concerns' },
-  { value: 'alcohol_use', label: 'Alcohol Use' },
-]
-
 export function InterventionForm({ onSubmit, isLoading, useLlm, onToggleLlm }: InterventionFormProps) {
-  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<InterventionInput>({
+  const { register, handleSubmit, formState: { errors } } = useForm<InterventionInput>({
     resolver: zodResolver(interventionSchema),
     defaultValues: {
-      student_id: '',
-      risk_level: 'medium',
-      risk_factors: ['low_grades'],
+      risk_score: 50,
+      completion_rate: 0.5,
+      avg_score: 50,
+      total_clicks: 0,
+      studied_credits: 60,
+      num_of_prev_attempts: 0,
+      student_name: '',
+      module_name: '',
     },
   })
-
-  const selectedFactors = watch('risk_factors') || []
-
-  const toggleFactor = (factor: string) => {
-    const current = selectedFactors
-    if (current.includes(factor)) {
-      setValue('risk_factors', current.filter((f) => f !== factor))
-    } else {
-      setValue('risk_factors', [...current, factor])
-    }
-  }
 
   const handleFormSubmit = (data: InterventionInput) => {
     onSubmit({ ...data, use_llm: useLlm })
@@ -62,54 +49,70 @@ export function InterventionForm({ onSubmit, isLoading, useLlm, onToggleLlm }: I
       <CardHeader>
         <CardTitle>Generate Interventions</CardTitle>
         <CardDescription>
-          Select risk factors to generate targeted intervention recommendations
+          Enter student metrics to generate targeted intervention recommendations
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input
-            label="Student ID (optional)"
-            placeholder="Enter student ID"
-            {...register('student_id')}
+            label="Risk Score (0-100)"
+            type="number"
+            placeholder="e.g. 75"
+            {...register('risk_score')}
+            error={errors.risk_score?.message}
           />
-          <Select
-            label="Risk Level"
-            {...register('risk_level')}
-            options={[
-              { value: 'low', label: 'Low Risk' },
-              { value: 'medium', label: 'Medium Risk' },
-              { value: 'high', label: 'High Risk' },
-            ]}
-            error={errors.risk_level?.message}
+          <Input
+            label="Completion Rate (0-1)"
+            type="number"
+            step="0.01"
+            placeholder="e.g. 0.35"
+            {...register('completion_rate')}
+            error={errors.completion_rate?.message}
+          />
+          <Input
+            label="Avg Score (0-100)"
+            type="number"
+            placeholder="e.g. 45"
+            {...register('avg_score')}
+            error={errors.avg_score?.message}
+          />
+          <Input
+            label="Total VLE Clicks"
+            type="number"
+            placeholder="e.g. 150"
+            {...register('total_clicks')}
+            error={errors.total_clicks?.message}
+          />
+          <Input
+            label="Studied Credits"
+            type="number"
+            placeholder="e.g. 60"
+            {...register('studied_credits')}
+            error={errors.studied_credits?.message}
+          />
+          <Input
+            label="Previous Attempts"
+            type="number"
+            placeholder="e.g. 0"
+            {...register('num_of_prev_attempts')}
+            error={errors.num_of_prev_attempts?.message}
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">
-            Risk Factors
-          </label>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            {riskFactorOptions.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => toggleFactor(option.value)}
-                className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
-                  selectedFactors.includes(option.value)
-                    ? 'bg-primary text-white border-primary'
-                    : 'bg-white text-gray-700 border-gray-300 hover:border-primary'
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-          {errors.risk_factors && (
-            <p className="mt-2 text-sm text-danger">{errors.risk_factors.message}</p>
-          )}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Input
+            label="Student Name (optional)"
+            placeholder="For personalized messaging"
+            {...register('student_name')}
+          />
+          <Input
+            label="Module Name (optional)"
+            placeholder="e.g. Introduction to CS"
+            {...register('module_name')}
+          />
         </div>
 
-        <div className="flex items-center justify-between pt-4 border-t">
+        <div className="flex items-center justify-between pt-4 border-t border-surface-200 dark:border-surface-700">
           <Toggle
             checked={useLlm}
             onChange={onToggleLlm}

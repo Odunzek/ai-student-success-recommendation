@@ -120,21 +120,61 @@ class StudentDataLoader:
         self,
         limit: int = 100,
         offset: int = 0,
-    ) -> list[dict]:
-        """Get paginated list of students.
+        search: str | None = None,
+        risk_level: str | None = None,
+    ) -> tuple[list[dict], int]:
+        """Get paginated list of students with optional filtering.
 
         Args:
             limit: Maximum number of records to return
             offset: Number of records to skip
+            search: Optional search string to filter by student_id
+            risk_level: Optional risk level filter ('low', 'medium', 'high')
 
         Returns:
-            List of student dicts
+            Tuple of (list of student dicts, total matching count)
         """
         if not self.is_loaded:
-            return []
+            return [], 0
 
-        subset = self._data.iloc[offset:offset + limit]
-        return subset.to_dict(orient="records")
+        df = self._data.copy()
+
+        # Apply search filter if provided
+        if search:
+            search_lower = search.lower()
+            # Search in student_id column
+            if "student_id" in df.columns:
+                mask = df["student_id"].astype(str).str.lower().str.contains(search_lower, na=False)
+                df = df[mask]
+
+        # Apply risk level filter if provided
+        if risk_level and risk_level in ("low", "medium", "high"):
+            # Calculate risk scores for filtering
+            # Using the same thresholds as predictor.py (70 for high, 40 for medium)
+            from src.models.predictor import get_predictor
+            predictor = get_predictor()
+
+            if predictor.is_loaded:
+                # Filter by predicted risk level
+                risk_mask = []
+                for idx, row in df.iterrows():
+                    try:
+                        features = {
+                            "num_of_prev_attempts": int(row.get("num_of_prev_attempts", 0)),
+                            "studied_credits": int(row.get("studied_credits", 60)),
+                            "avg_score": float(row.get("avg_score", 50)),
+                            "total_clicks": int(row.get("total_clicks", 0)),
+                            "completion_rate": float(row.get("completion_rate", 0.5)),
+                        }
+                        result = predictor.predict(features)
+                        risk_mask.append(result.get("risk_level", "low") == risk_level)
+                    except Exception:
+                        risk_mask.append(False)
+                df = df[risk_mask]
+
+        total_count = len(df)
+        subset = df.iloc[offset:offset + limit]
+        return subset.to_dict(orient="records"), total_count
 
     def get_statistics(self) -> dict:
         """Get summary statistics of the student data.

@@ -45,6 +45,13 @@ class Settings(BaseSettings):
         "module_GGG",
     ]
 
+    # Risk classification thresholds (configurable via env)
+    risk_threshold_high: int = 70  # Score >= this is high risk
+    risk_threshold_medium: int = 40  # Score >= this is medium risk (below is low)
+
+    # Model accuracy (if known from training, otherwise None)
+    model_accuracy: float | None = None
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

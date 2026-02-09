@@ -19,15 +19,15 @@ async def list_students(
     page: int = Query(default=1, ge=1, description="Page number"),
     per_page: int = Query(default=20, ge=1, le=100, description="Items per page"),
     search: str = Query(default=None, description="Search by student ID"),
-    risk_level: str = Query(default=None, description="Filter by risk level"),
+    risk_level: str = Query(default=None, description="Filter by risk level (low, medium, high)"),
 ):
-    """Get paginated list of students.
+    """Get paginated list of students with optional filtering.
 
     Args:
         page: Page number (1-indexed)
         per_page: Items per page (1-100)
-        search: Optional search filter
-        risk_level: Optional risk level filter
+        search: Optional search filter to match against student_id
+        risk_level: Optional risk level filter ('low', 'medium', 'high')
 
     Returns:
         List of student records with pagination info
@@ -41,9 +41,16 @@ async def list_students(
         )
 
     offset = (page - 1) * per_page
-    students = loader.get_all_students(limit=per_page, offset=offset)
-    total = loader.data.shape[0] if loader.is_loaded else 0
-    total_pages = (total + per_page - 1) // per_page
+
+    # Get filtered students with total count
+    students, total = loader.get_all_students(
+        limit=per_page,
+        offset=offset,
+        search=search,
+        risk_level=risk_level,
+    )
+
+    total_pages = (total + per_page - 1) // per_page if total > 0 else 1
 
     # Add student_id field if not present and format for frontend
     formatted_students = []

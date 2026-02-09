@@ -13,8 +13,9 @@ interface StudentModalProps {
 }
 
 export function StudentModal({ studentId, isOpen, onClose }: StudentModalProps) {
-  const { data: student, isLoading: studentLoading, error: studentError } = useStudent(studentId || '')
-  const { data: prediction, isLoading: predictionLoading } = useStudentPredict(studentId || '')
+  // Pass studentId directly - the hooks have enabled: !!id guard that handles null/empty
+  const { data: student, isLoading: studentLoading, error: studentError } = useStudent(studentId ?? '')
+  const { data: prediction, isLoading: predictionLoading } = useStudentPredict(studentId ?? '')
 
   const isLoading = studentLoading || predictionLoading
 
@@ -48,7 +49,7 @@ export function StudentModal({ studentId, isOpen, onClose }: StudentModalProps) 
                 <InfoItem label="Family Size" value={student.family_size} />
                 <InfoItem label="Parental Status" value={student.parental_status === 'T' ? 'Together' : 'Apart'} />
                 <InfoItem label="Guardian" value={student.guardian} />
-                <InfoItem label="Family Relations" value={`${student.family_relations}/5`} />
+                <InfoItem label="Family Relations" value={student.family_relations ? `${student.family_relations}/5` : undefined} />
               </div>
             </div>
 
@@ -60,7 +61,7 @@ export function StudentModal({ studentId, isOpen, onClose }: StudentModalProps) 
                 <InfoItem label="Grade 3" value={student.g3} />
                 <InfoItem label="Absences" value={student.absences} />
                 <InfoItem label="Failures" value={student.failures} />
-                <InfoItem label="Study Time" value={`${student.study_time}/4`} />
+                <InfoItem label="Study Time" value={student.study_time ? `${student.study_time}/4` : undefined} />
               </div>
             </div>
 
@@ -100,11 +101,11 @@ export function StudentModal({ studentId, isOpen, onClose }: StudentModalProps) 
   )
 }
 
-function InfoItem({ label, value }: { label: string; value: string | number }) {
+function InfoItem({ label, value }: { label: string; value: string | number | undefined }) {
   return (
     <div>
       <dt className="text-xs text-gray-500">{label}</dt>
-      <dd className="text-sm font-medium text-gray-900">{value}</dd>
+      <dd className="text-sm font-medium text-gray-900">{value ?? 'N/A'}</dd>
     </div>
   )
 }

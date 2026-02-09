@@ -83,6 +83,8 @@ class HybridEngine:
                 completion_rate=completion_rate,
                 avg_score=avg_score,
                 total_clicks=total_clicks,
+                studied_credits=studied_credits,
+                num_of_prev_attempts=num_of_prev_attempts,
                 interventions=rule_result["interventions"],
                 student_name=student_name,
                 module_name=module_name,
@@ -107,26 +109,103 @@ class HybridEngine:
             return rule_result
 
     def _merge_llm_response(self, rule_result: dict, llm_response: str) -> dict:
-        """Merge LLM response with rule-based result."""
+        """Merge LLM response with rule-based result.
+
+        Parses the detailed intervention format with Why, Action, Owner, Timeline, Success fields.
+        """
         result = rule_result.copy()
         result["llm_enhanced"] = True
 
         # Parse summary
-        summary_match = re.search(r"SUMMARY:\s*(.+?)(?=ENHANCED:|$)", llm_response, re.DOTALL)
+        summary_match = re.search(r"SUMMARY:\s*(.+?)(?=INTERVENTIONS:|$)", llm_response, re.DOTALL | re.IGNORECASE)
         if summary_match:
             result["summary"] = summary_match.group(1).strip()
 
-        # Parse enhanced interventions
-        interventions_match = re.search(r"ENHANCED:\s*(.+)", llm_response, re.DOTALL)
+        # Parse detailed interventions
+        interventions_match = re.search(r"INTERVENTIONS:\s*(.+)", llm_response, re.DOTALL | re.IGNORECASE)
         if interventions_match:
             enhanced_text = interventions_match.group(1)
-            items = re.findall(r"\d+\.\s*(.+?)(?=\d+\.|$)", enhanced_text, re.DOTALL)
 
-            for i, item in enumerate(items):
-                if i < len(result["interventions"]):
-                    enhanced_desc = item.strip()
-                    if enhanced_desc:
-                        result["interventions"][i]["description"] = enhanced_desc
+            # Match each numbered intervention block with its details
+            # Pattern: 1. **Title** followed by Why:, Action:, etc.
+            intervention_blocks = re.split(r'\n\s*\d+\.\s*\*\*', enhanced_text)
+
+            new_interventions = []
+            for i, block in enumerate(intervention_blocks[1:], 0):  # Skip first empty split
+                if not block.strip():
+                    continue
+
+                # Parse title (before the closing **)
+                title_match = re.match(r'([^*]+)\*\*', block)
+                title = title_match.group(1).strip() if title_match else f"Intervention {i+1}"
+
+                # Parse the details
+                why_match = re.search(r'Why:\s*(.+?)(?=Action:|Owner:|Timeline:|Success:|$)', block, re.DOTALL | re.IGNORECASE)
+                action_match = re.search(r'Action:\s*(.+?)(?=Why:|Owner:|Timeline:|Success:|$)', block, re.DOTALL | re.IGNORECASE)
+                owner_match = re.search(r'Owner:\s*(.+?)(?=Why:|Action:|Timeline:|Success:|$)', block, re.DOTALL | re.IGNORECASE)
+                timeline_match = re.search(r'Timeline:\s*(.+?)(?=Why:|Action:|Owner:|Success:|$)', block, re.DOTALL | re.IGNORECASE)
+                success_match = re.search(r'Success:\s*(.+?)(?=Why:|Action:|Owner:|Timeline:|$)', block, re.DOTALL | re.IGNORECASE)
+
+                # Build detailed description
+                description_parts = []
+                if why_match:
+                    description_parts.append(why_match.group(1).strip())
+                if action_match:
+                    description_parts.append(f"**Action:** {action_match.group(1).strip()}")
+                if owner_match:
+                    description_parts.append(f"**Owner:** {owner_match.group(1).strip()}")
+                if timeline_match:
+                    description_parts.append(f"**Timeline:** {timeline_match.group(1).strip()}")
+                if success_match:
+                    description_parts.append(f"**Success Metric:** {success_match.group(1).strip()}")
+
+                description = "\n".join(description_parts) if description_parts else block.strip()
+
+                # Determine priority based on timeline
+                priority = "medium"
+                if timeline_match:
+                    timeline_text = timeline_match.group(1).lower()
+                    if "immediate" in timeline_text or "today" in timeline_text or "urgent" in timeline_text:
+                        priority = "critical"
+                    elif "this week" in timeline_text:
+                        priority = "high"
+                    elif "ongoing" in timeline_text or "monthly" in timeline_text:
+                        priority = "medium"
+
+                # Determine type based on content
+                intervention_type = "support"
+                lower_title = title.lower()
+                lower_desc = description.lower()
+                if any(w in lower_title or w in lower_desc for w in ["tutor", "study", "academic", "assessment", "grade"]):
+                    intervention_type = "academic"
+                elif any(w in lower_title or w in lower_desc for w in ["engage", "click", "activity", "participation", "attend"]):
+                    intervention_type = "engagement"
+                elif any(w in lower_title or w in lower_desc for w in ["urgent", "critical", "immediate", "crisis"]):
+                    intervention_type = "urgent"
+
+                new_interventions.append({
+                    "type": intervention_type,
+                    "priority": priority,
+                    "title": title,
+                    "description": description,
+                    "actions": [],  # Could be parsed separately if needed
+                })
+
+            # Use LLM interventions if we parsed any, otherwise keep rule-based
+            if new_interventions:
+                result["interventions"] = new_interventions
+
+        # Fallback: try old format if new format didn't work
+        if not interventions_match or not result.get("interventions"):
+            enhanced_match = re.search(r"ENHANCED:\s*(.+)", llm_response, re.DOTALL)
+            if enhanced_match:
+                enhanced_text = enhanced_match.group(1)
+                items = re.findall(r"\d+\.\s*(.+?)(?=\d+\.|$)", enhanced_text, re.DOTALL)
+                for i, item in enumerate(items):
+                    if i < len(result["interventions"]):
+                        enhanced_desc = item.strip()
+                        if enhanced_desc:
+                            result["interventions"][i]["description"] = enhanced_desc
 
         return result
 

@@ -69,7 +69,7 @@ export function DataTab() {
               </Alert>
             )}
 
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-surface-500 dark:text-surface-400">
               <p className="font-medium mb-2">Expected CSV Format:</p>
               <ul className="list-disc list-inside space-y-1 text-xs">
                 <li>Headers: student_id, gender, age, address, family_size, etc.</li>
@@ -103,8 +103,8 @@ export function DataTab() {
               </CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Delete all student data</p>
-                  <p className="text-xs text-gray-400">This action cannot be undone</p>
+                  <p className="text-sm text-surface-600 dark:text-surface-400">Delete all student data</p>
+                  <p className="text-xs text-surface-400 dark:text-surface-500">This action cannot be undone</p>
                 </div>
                 <Button
                   variant="danger"

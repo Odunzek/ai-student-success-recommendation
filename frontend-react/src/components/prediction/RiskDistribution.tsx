@@ -1,21 +1,16 @@
 import { motion } from 'framer-motion'
-import { Play } from 'lucide-react'
-import { Button } from '../ui/Button'
 import { Card, CardHeader, CardTitle } from '../ui/Card'
 import { staggerContainer, fadeInUp } from '../../lib/animations'
 import type { DashboardStats } from '../../types/prediction'
 
 interface RiskDistributionProps {
   stats: DashboardStats | undefined
-  onRunBatch: () => void
-  isRunningBatch: boolean
 }
 
-export function RiskDistribution({ stats, onRunBatch, isRunningBatch }: RiskDistributionProps) {
+export function RiskDistribution({ stats }: RiskDistributionProps) {
   const high = stats?.high_risk_count ?? 0
   const medium = stats?.medium_risk_count ?? 0
   const low = stats?.low_risk_count ?? 0
-  const totalStudents = stats?.total_students ?? 0
   const total = high + medium + low
 
   const highPct = total > 0 ? (high / total) * 100 : 0
@@ -29,7 +24,7 @@ export function RiskDistribution({ stats, onRunBatch, isRunningBatch }: RiskDist
       </CardHeader>
 
       <div className="flex flex-col items-center">
-        <DonutChart high={highPct} medium={mediumPct} low={lowPct} />
+        <DonutChart high={highPct} medium={mediumPct} low={lowPct} totalCount={total} />
 
         <motion.div
           className="mt-6 space-y-3 w-full"
@@ -41,24 +36,6 @@ export function RiskDistribution({ stats, onRunBatch, isRunningBatch }: RiskDist
           <LegendItem color="warning" label="Medium Risk" count={medium} percentage={mediumPct} delay={0.5} />
           <LegendItem color="success" label="Low Risk" count={low} percentage={lowPct} delay={0.6} />
         </motion.div>
-
-        <motion.div
-          className="mt-6 w-full"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
-        >
-          <Button
-            onClick={onRunBatch}
-            isLoading={isRunningBatch}
-            className="w-full"
-            disabled={totalStudents === 0}
-            variant="gradient"
-            leftIcon={<Play className="h-4 w-4" />}
-          >
-            Run Batch Prediction
-          </Button>
-        </motion.div>
       </div>
     </Card>
   )
@@ -68,15 +45,16 @@ interface DonutChartProps {
   high: number
   medium: number
   low: number
+  totalCount: number
 }
 
-function DonutChart({ high, medium, low }: DonutChartProps) {
+function DonutChart({ high, medium, low, totalCount }: DonutChartProps) {
   const radius = 40
   const circumference = 2 * Math.PI * radius
   const strokeWidth = 12
-  const total = high + medium + low
+  // high + medium + low should sum to ~100 (percentages)
 
-  if (total === 0) {
+  if (totalCount === 0) {
     return (
       <div className="w-40 h-40 flex items-center justify-center">
         <svg viewBox="0 0 100 100" className="w-full h-full">
@@ -204,7 +182,7 @@ function DonutChart({ high, medium, low }: DonutChartProps) {
         transition={{ delay: 0.8, duration: 0.3 }}
       >
         <span className="text-2xl font-bold text-surface-900 dark:text-white">
-          {total}
+          {totalCount}
         </span>
         <span className="text-xs text-surface-500 dark:text-surface-400">
           Students

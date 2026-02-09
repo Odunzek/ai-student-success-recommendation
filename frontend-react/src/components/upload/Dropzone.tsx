@@ -1,6 +1,46 @@
 import { useCallback, useState } from 'react'
-import { Upload, FileText, X } from 'lucide-react'
+import { Upload, FileText, X, AlertCircle } from 'lucide-react'
 import { cn } from '../../lib/utils'
+
+// Valid MIME types for CSV files (browsers may report different types)
+const VALID_CSV_MIME_TYPES = [
+  'text/csv',
+  'text/plain',
+  'application/csv',
+  'application/vnd.ms-excel', // Windows Excel may use this for CSV
+  'application/octet-stream', // Some systems report this
+]
+
+// Valid MIME types for ZIP files
+const VALID_ZIP_MIME_TYPES = [
+  'application/zip',
+  'application/x-zip-compressed',
+  'application/x-zip',
+]
+
+function isValidFile(file: File, accept: string): { valid: boolean; reason?: string } {
+  const extension = file.name.toLowerCase().split('.').pop()
+  const mimeType = file.type.toLowerCase()
+
+  // Check extension first
+  if (accept.includes('.csv') && extension === 'csv') {
+    // For CSV, check MIME type (but be lenient since browsers vary)
+    if (mimeType && !VALID_CSV_MIME_TYPES.includes(mimeType) && mimeType !== '') {
+      // Only reject if MIME type is explicitly wrong (not empty)
+      return { valid: false, reason: `Invalid file type: ${mimeType}. Expected a CSV file.` }
+    }
+    return { valid: true }
+  }
+
+  if (accept.includes('.zip') && extension === 'zip') {
+    if (mimeType && !VALID_ZIP_MIME_TYPES.includes(mimeType) && mimeType !== '') {
+      return { valid: false, reason: `Invalid file type: ${mimeType}. Expected a ZIP file.` }
+    }
+    return { valid: true }
+  }
+
+  return { valid: false, reason: `Invalid file extension. Expected ${accept}` }
+}
 
 interface DropzoneProps {
   onFileSelect: (file: File) => void
@@ -8,9 +48,10 @@ interface DropzoneProps {
   disabled?: boolean
 }
 
-export function Dropzone({ onFileSelect, accept = '.csv', disabled }: DropzoneProps) {
+export function Dropzone({ onFileSelect, accept = '.csv,.zip', disabled }: DropzoneProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -28,29 +69,43 @@ export function Dropzone({ onFileSelect, accept = '.csv', disabled }: DropzonePr
     e.preventDefault()
     e.stopPropagation()
     setIsDragging(false)
+    setError(null)
 
     if (disabled) return
 
     const files = e.dataTransfer.files
     if (files.length > 0) {
       const file = files[0]
-      if (file.name.endsWith('.csv')) {
+      const validation = isValidFile(file, accept)
+      if (validation.valid) {
         setSelectedFile(file)
         onFileSelect(file)
+      } else {
+        setError(validation.reason ?? 'Invalid file type')
       }
     }
-  }, [disabled, onFileSelect])
+  }, [disabled, onFileSelect, accept])
 
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setError(null)
     const files = e.target.files
     if (files && files.length > 0) {
-      setSelectedFile(files[0])
-      onFileSelect(files[0])
+      const file = files[0]
+      const validation = isValidFile(file, accept)
+      if (validation.valid) {
+        setSelectedFile(file)
+        onFileSelect(file)
+      } else {
+        setError(validation.reason ?? 'Invalid file type')
+        // Clear the input so the same file can be selected again
+        e.target.value = ''
+      }
     }
-  }, [onFileSelect])
+  }, [onFileSelect, accept])
 
   const clearFile = () => {
     setSelectedFile(null)
+    setError(null)
   }
 
   return (
@@ -94,12 +149,20 @@ export function Dropzone({ onFileSelect, accept = '.csv', disabled }: DropzonePr
       ) : (
         <div className="text-center">
           <Upload className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-          <p className="text-lg font-medium text-gray-900 mb-1">
-            Drop your CSV file here
+          <p className="text-lg font-medium text-gray-900 dark:text-white mb-1">
+            Drop your CSV or ZIP file here
           </p>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             or click to browse
           </p>
+        </div>
+      )}
+
+      {/* Error message */}
+      {error && (
+        <div className="mt-4 flex items-center gap-2 text-sm text-danger-600 dark:text-danger-400 bg-danger-50 dark:bg-danger-900/20 px-3 py-2 rounded-lg">
+          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+          <span>{error}</span>
         </div>
       )}
     </div>

@@ -45,12 +45,12 @@ export function ChatInterface({
   }
 
   return (
-    <div className="flex flex-col h-[600px] bg-white rounded-xl border border-gray-200">
+    <div className="flex flex-col h-[600px] bg-white dark:bg-surface-900 rounded-xl border border-surface-200 dark:border-surface-800">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-surface-200 dark:border-surface-800">
         <div>
-          <h3 className="font-medium text-gray-900">AI Assistant</h3>
-          <p className="text-xs text-gray-500">
+          <h3 className="font-medium text-surface-900 dark:text-white">AI Assistant</h3>
+          <p className="text-xs text-surface-500 dark:text-surface-400">
             Ask questions about student data and dropout prevention
           </p>
         </div>
@@ -64,7 +64,7 @@ export function ChatInterface({
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
+          <div className="text-center py-12 text-surface-500 dark:text-surface-400">
             <p className="mb-2">No messages yet</p>
             <p className="text-sm">Start a conversation by typing a message below</p>
           </div>
@@ -75,7 +75,7 @@ export function ChatInterface({
         )}
 
         {isLoading && (
-          <div className="flex items-center gap-2 text-gray-500">
+          <div className="flex items-center gap-2 text-surface-500 dark:text-surface-400">
             <Spinner size="sm" />
             <span className="text-sm">Thinking...</span>
           </div>
@@ -85,7 +85,7 @@ export function ChatInterface({
       </div>
 
       {/* Input */}
-      <form onSubmit={handleSubmit} className="p-4 border-t border-gray-200">
+      <form onSubmit={handleSubmit} className="p-4 border-t border-surface-200 dark:border-surface-800">
         {!isAvailable && (
           <div className="text-sm text-warning mb-2">
             Chat service is currently unavailable
@@ -99,7 +99,7 @@ export function ChatInterface({
             onKeyDown={handleKeyDown}
             placeholder={isAvailable ? "Type your message..." : "Chat unavailable"}
             disabled={!isAvailable || isLoading}
-            className="flex-1 resize-none rounded-lg border border-gray-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-gray-50 disabled:cursor-not-allowed"
+            className="flex-1 resize-none rounded-lg border border-surface-300 dark:border-surface-700 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-surface-50 dark:disabled:bg-surface-800 disabled:cursor-not-allowed"
             rows={1}
           />
           <Button
@@ -109,7 +109,7 @@ export function ChatInterface({
             <Send className="h-4 w-4" />
           </Button>
         </div>
-        <p className="text-xs text-gray-400 mt-2">
+        <p className="text-xs text-surface-400 dark:text-surface-500 mt-2">
           Press Enter to send, Shift+Enter for new line
         </p>
       </form>

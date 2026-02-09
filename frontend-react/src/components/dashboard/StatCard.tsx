@@ -14,6 +14,9 @@ interface StatCardProps {
   }
   variant?: 'default' | 'primary' | 'success' | 'warning' | 'danger'
   delay?: number
+  badge?: React.ReactNode
+  subtitle?: string
+  children?: React.ReactNode
 }
 
 function AnimatedNumber({ value }: { value: number }) {
@@ -49,6 +52,9 @@ export function StatCard({
   trend,
   variant = 'default',
   delay = 0,
+  badge,
+  subtitle,
+  children,
 }: StatCardProps) {
   const variants = {
     default: cn(
@@ -128,9 +134,12 @@ export function StatCard({
     >
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <p className="text-sm font-medium text-surface-500 dark:text-surface-400">
-            {title}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-surface-500 dark:text-surface-400">
+              {title}
+            </p>
+            {badge}
+          </div>
           <p className="mt-2 text-3xl font-bold text-surface-900 dark:text-white">
             {isNumeric ? (
               <AnimatedNumber value={numericValue} />
@@ -138,6 +147,11 @@ export function StatCard({
               value
             )}
           </p>
+          {subtitle && (
+            <p className="mt-1 text-xs text-surface-400 dark:text-surface-500">
+              {subtitle}
+            </p>
+          )}
           {trend && (
             <motion.div
               className={cn(
@@ -170,6 +184,11 @@ export function StatCard({
           <Icon className="h-6 w-6" />
         </motion.div>
       </div>
+      {children && (
+        <div className="mt-3">
+          {children}
+        </div>
+      )}
     </motion.div>
   )
 }

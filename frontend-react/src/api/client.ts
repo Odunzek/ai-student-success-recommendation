@@ -1,3 +1,8 @@
+/**
+ * API base URL - Vite proxy handles the /api -> /api/v1 transformation
+ * See vite.config.ts for proxy configuration
+ * Backend uses /api/v1 prefix (defined in src/config.py)
+ */
 const API_BASE = '/api'
 
 export class ApiError extends Error {
@@ -61,6 +66,15 @@ export const api = {
     const response = await fetch(`${API_BASE}${endpoint}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
+    })
+    return handleResponse<T>(response)
+  },
+
+  async put<T>(endpoint: string, body?: unknown): Promise<T> {
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined,
     })
     return handleResponse<T>(response)
   },

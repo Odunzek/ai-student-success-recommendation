@@ -27,6 +27,8 @@ class UploadResponse(BaseModel):
     rows_processed: int
     filename: str
     format_detected: str = ""
+    warning: str | None = None
+    defaulted_columns: list[str] = []
 
 
 class UploadStatusResponse(BaseModel):
@@ -96,6 +98,16 @@ async def upload_csv(
             detail=f"Missing required features: {', '.join(missing)}"
         )
 
+    # Parse format_detected for defaulted columns warning
+    warning = None
+    defaulted_columns: list[str] = []
+    actual_format = format_detected
+
+    if format_detected.startswith("unknown_with_defaults:"):
+        actual_format = "unknown_with_defaults"
+        defaulted_columns = format_detected.split(":")[1].split(",")
+        warning = f"Missing columns were filled with default values: {', '.join(defaulted_columns)}"
+
     # Save processed file
     upload_dir = ensure_upload_dir()
     output_path = upload_dir / "uploaded_data.csv"
@@ -109,7 +121,9 @@ async def upload_csv(
         message=f"Successfully loaded {len(df)} records",
         rows_processed=len(df),
         filename=file.filename or "unknown.csv",
-        format_detected=format_detected,
+        format_detected=actual_format,
+        warning=warning,
+        defaulted_columns=defaulted_columns,
     )
 
 
