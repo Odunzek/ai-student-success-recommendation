@@ -1,47 +1,43 @@
-"""LLM prompt templates for intervention personalization."""
+"""LLM prompt templates for intervention personalization and chat."""
 
 
-SYSTEM_PROMPT = """You are an academic advisor assistant helping to personalize intervention messages for students at risk of academic difficulties.
-
-Your role is to:
-1. Take rule-based intervention recommendations and make them more personal and actionable
-2. Use empathetic, supportive language that motivates rather than discourages
-3. Be specific and practical in your suggestions
-4. Consider the student's specific situation based on their metrics
-
-Always maintain a supportive, non-judgmental tone. Focus on growth and improvement rather than criticism."""
+# Concise system prompt for intervention enhancement
+SYSTEM_PROMPT = """You are an academic advisor at Cambrian College. Be empathetic, specific, and action-oriented. Keep responses brief."""
 
 
-INTERVENTION_ENHANCEMENT_TEMPLATE = """Based on the following student situation, please enhance the intervention recommendations with personalized, empathetic messaging.
-
-## Student Situation
+# Concise intervention enhancement template
+INTERVENTION_ENHANCEMENT_TEMPLATE = """Student metrics: Risk {risk_score}% ({risk_level}), Completion {completion_rate:.0%}, Avg Score {avg_score:.0f}%, Engagement {total_clicks} clicks.
 {student_context}
 
-## Current Metrics
-- Risk Score: {risk_score}/100 ({risk_level} risk)
-- Assessment Completion Rate: {completion_rate:.0%}
-- Average Score: {avg_score:.0f}%
-- Platform Engagement (clicks): {total_clicks}
-- Credits Studied: {studied_credits}
-- Previous Attempts: {num_of_prev_attempts}
-
-## Rule-Based Recommendations
+Current recommendations:
 {rule_recommendations}
 
-## Your Task
-Please provide:
-1. A personalized summary (2-3 sentences) of the student's situation and what support they need
-2. Enhanced versions of the intervention descriptions that are more personal and actionable
+Respond in this exact format:
+SUMMARY: [1-2 sentence personalized assessment]
 
-Format your response as:
-SUMMARY: [Your personalized summary]
+ENHANCED:
+1. [Enhanced first intervention - 1 sentence]
+2. [Enhanced second intervention - 1 sentence]"""
 
-ENHANCED_INTERVENTIONS:
-1. [First intervention - enhanced description]
-2. [Second intervention - enhanced description]
-...
 
-Keep each enhanced description to 2-3 sentences. Be specific and actionable."""
+# Chat system prompt for AI assistant
+CHAT_SYSTEM_PROMPT = """You are an AI assistant for the Cambrian College Student Success Platform. You help advisors understand student risk data and intervention strategies.
+
+Keep responses concise (2-4 sentences). Be helpful and practical. You can:
+- Explain risk scores and what they mean
+- Suggest intervention approaches
+- Answer questions about student support strategies
+- Help interpret SHAP factors (feature impacts on risk)
+
+If asked about specific students, use the data provided in context."""
+
+
+# Chat prompt template
+CHAT_TEMPLATE = """Context: {context}
+
+Question: {message}
+
+Provide a brief, helpful response."""
 
 
 def format_student_context(
@@ -54,26 +50,17 @@ def format_student_context(
         parts.append(f"Student: {student_name}")
     if module_name:
         parts.append(f"Module: {module_name}")
-
-    if not parts:
-        return "No additional context provided."
-    return "\n".join(parts)
+    return " | ".join(parts) if parts else ""
 
 
 def format_rule_recommendations(interventions: list[dict]) -> str:
-    """Format rule-based recommendations for the prompt."""
+    """Format rule-based recommendations concisely."""
     if not interventions:
-        return "No specific interventions identified."
+        return "None"
 
     lines = []
-    for i, intervention in enumerate(interventions, 1):
-        lines.append(f"{i}. {intervention['title']} ({intervention['priority']} priority)")
-        lines.append(f"   Type: {intervention['type']}")
-        lines.append(f"   Description: {intervention['description']}")
-        if intervention.get('actions'):
-            lines.append(f"   Actions: {', '.join(intervention['actions'][:3])}")
-        lines.append("")
-
+    for i, inv in enumerate(interventions[:3], 1):  # Limit to 3
+        lines.append(f"{i}. {inv['title']} ({inv['priority']})")
     return "\n".join(lines)
 
 
@@ -83,13 +70,13 @@ def create_intervention_prompt(
     completion_rate: float,
     avg_score: float,
     total_clicks: int,
-    studied_credits: int,
-    num_of_prev_attempts: int,
-    interventions: list[dict],
+    studied_credits: int = 60,
+    num_of_prev_attempts: int = 0,
+    interventions: list[dict] = None,
     student_name: str | None = None,
     module_name: str | None = None,
 ) -> str:
-    """Create the full prompt for intervention enhancement."""
+    """Create concise prompt for intervention enhancement."""
     return INTERVENTION_ENHANCEMENT_TEMPLATE.format(
         student_context=format_student_context(student_name, module_name),
         risk_score=risk_score,
@@ -97,7 +84,13 @@ def create_intervention_prompt(
         completion_rate=completion_rate,
         avg_score=avg_score,
         total_clicks=total_clicks,
-        studied_credits=studied_credits,
-        num_of_prev_attempts=num_of_prev_attempts,
-        rule_recommendations=format_rule_recommendations(interventions),
+        rule_recommendations=format_rule_recommendations(interventions or []),
+    )
+
+
+def create_chat_prompt(message: str, context: str | None = None) -> str:
+    """Create prompt for chat responses."""
+    return CHAT_TEMPLATE.format(
+        context=context or "No specific context provided.",
+        message=message,
     )

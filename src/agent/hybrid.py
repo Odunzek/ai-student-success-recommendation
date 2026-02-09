@@ -83,8 +83,6 @@ class HybridEngine:
                 completion_rate=completion_rate,
                 avg_score=avg_score,
                 total_clicks=total_clicks,
-                studied_credits=studied_credits,
-                num_of_prev_attempts=num_of_prev_attempts,
                 interventions=rule_result["interventions"],
                 student_name=student_name,
                 module_name=module_name,
@@ -109,40 +107,26 @@ class HybridEngine:
             return rule_result
 
     def _merge_llm_response(self, rule_result: dict, llm_response: str) -> dict:
-        """Merge LLM response with rule-based result.
-
-        Args:
-            rule_result: Original rule-based result
-            llm_response: Raw LLM response text
-
-        Returns:
-            Enhanced result with LLM improvements
-        """
+        """Merge LLM response with rule-based result."""
         result = rule_result.copy()
         result["llm_enhanced"] = True
 
-        # Parse summary from LLM response
-        summary_match = re.search(r"SUMMARY:\s*(.+?)(?=ENHANCED_INTERVENTIONS:|$)", llm_response, re.DOTALL)
+        # Parse summary
+        summary_match = re.search(r"SUMMARY:\s*(.+?)(?=ENHANCED:|$)", llm_response, re.DOTALL)
         if summary_match:
             result["summary"] = summary_match.group(1).strip()
 
         # Parse enhanced interventions
-        interventions_match = re.search(r"ENHANCED_INTERVENTIONS:\s*(.+)", llm_response, re.DOTALL)
+        interventions_match = re.search(r"ENHANCED:\s*(.+)", llm_response, re.DOTALL)
         if interventions_match:
             enhanced_text = interventions_match.group(1)
-            # Parse numbered items
             items = re.findall(r"\d+\.\s*(.+?)(?=\d+\.|$)", enhanced_text, re.DOTALL)
 
-            # Update intervention descriptions with enhancements
             for i, item in enumerate(items):
                 if i < len(result["interventions"]):
                     enhanced_desc = item.strip()
                     if enhanced_desc:
-                        # Keep original description but add enhanced version
-                        original = result["interventions"][i]["description"]
                         result["interventions"][i]["description"] = enhanced_desc
-                        # Optionally preserve original in a field
-                        result["interventions"][i]["original_description"] = original
 
         return result
 

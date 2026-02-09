@@ -6,6 +6,7 @@ from src.api.schemas.student import StudentFeatures
 from src.api.schemas.prediction import PredictionResponse, PredictionWithExplanation
 from src.models.predictor import get_predictor
 from src.models.explainer import get_explainer
+from src.etl.loader import get_data_loader
 
 router = APIRouter(prefix="/predict", tags=["Prediction"])
 
@@ -88,4 +89,69 @@ async def predict_with_explanation(student: StudentFeatures) -> PredictionWithEx
         raise HTTPException(
             status_code=500,
             detail=f"Prediction failed: {str(e)}"
+        )
+
+
+@router.post(
+    "/batch",
+    summary="Run batch predictions",
+    description="Run predictions on all uploaded students and update risk distribution.",
+)
+async def batch_predict():
+    """Run predictions on all students in the dataset.
+
+    Returns:
+        Summary of batch prediction results
+    """
+    predictor = get_predictor()
+    loader = get_data_loader()
+
+    if not predictor.is_loaded:
+        raise HTTPException(
+            status_code=503,
+            detail="Model not loaded. Please try again later."
+        )
+
+    if not loader.is_loaded:
+        raise HTTPException(
+            status_code=503,
+            detail="Student data not loaded."
+        )
+
+    try:
+        students = loader.get_all_students(limit=10000)
+        results = {"high": 0, "medium": 0, "low": 0}
+
+        for student in students:
+            try:
+                features = StudentFeatures(
+                    num_of_prev_attempts=int(student.get("num_of_prev_attempts", 0)),
+                    studied_credits=int(student.get("studied_credits", 60)),
+                    avg_score=float(student.get("avg_score", 50)),
+                    total_clicks=int(student.get("total_clicks", 0)),
+                    completion_rate=float(student.get("completion_rate", 0.5)),
+                    module_BBB=False,
+                    module_CCC=False,
+                    module_DDD=False,
+                    module_EEE=False,
+                    module_FFF=False,
+                    module_GGG=False,
+                )
+                result = predictor.predict(features.model_dump())
+                risk_level = result.get("risk_level", "low")
+                results[risk_level] = results.get(risk_level, 0) + 1
+            except Exception:
+                continue
+
+        return {
+            "processed": len(students),
+            "high_risk": results["high"],
+            "medium_risk": results["medium"],
+            "low_risk": results["low"],
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Batch prediction failed: {str(e)}"
         )

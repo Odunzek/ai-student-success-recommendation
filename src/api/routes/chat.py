@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from src.api.schemas.chat import ChatRequest, ChatResponse
 from src.agent.llm_client import get_llm_client
+from src.agent.prompts import CHAT_SYSTEM_PROMPT, create_chat_prompt
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
@@ -15,45 +16,28 @@ router = APIRouter(prefix="/chat", tags=["Chat"])
     description="Send a message to the AI assistant for help with student support questions.",
 )
 async def chat(request: ChatRequest) -> ChatResponse:
-    """Chat with the AI assistant.
-
-    The assistant can help with questions about student support,
-    intervention strategies, and academic advising.
-
-    Args:
-        request: User message and optional context
-
-    Returns:
-        AI assistant response and LLM availability status
-    """
+    """Chat with the AI assistant."""
     llm_client = get_llm_client()
 
-    # Check if LLM is available
     is_available = await llm_client.is_available()
 
     if not is_available:
         return ChatResponse(
-            response="I'm sorry, but the AI assistant is currently unavailable. "
-                     "Please ensure Ollama is running with the DeepSeek model. "
-                     "You can start it with: ollama run deepseek-r1:1.5b",
+            response="AI assistant unavailable. Start Ollama with: ollama serve",
             llm_available=False
         )
 
-    # Build the prompt with optional context
-    user_prompt = request.message
-    if request.context:
-        user_prompt = f"Context: {request.context}\n\nQuestion: {request.message}"
+    # Build prompt using template
+    prompt = create_chat_prompt(request.message, request.context)
 
-    # Generate response
     response = await llm_client.generate(
-        prompt=user_prompt,
-        system_prompt=None
+        prompt=prompt,
+        system_prompt=CHAT_SYSTEM_PROMPT
     )
 
     if response is None:
         return ChatResponse(
-            response="I encountered an error while processing your request. "
-                     "Please try again in a moment.",
+            response="Error processing request. Please try again.",
             llm_available=True
         )
 

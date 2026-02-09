@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     # LLM settings (Ollama)
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "deepseek-r1:1.5b"
-    llm_timeout: float = 30.0
+    llm_timeout: float = 120.0  # Increased for first model load
     llm_enabled: bool = True
 
     # Feature configuration

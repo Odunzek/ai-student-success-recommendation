@@ -19,15 +19,7 @@ class OllamaClient:
         prompt: str,
         system_prompt: str | None = None,
     ) -> str | None:
-        """Generate a response from the LLM.
-
-        Args:
-            prompt: The user prompt
-            system_prompt: Optional system prompt
-
-        Returns:
-            Generated text or None if failed
-        """
+        """Generate a response from the LLM."""
         url = f"{self.base_url}/api/generate"
 
         payload = {
@@ -39,23 +31,34 @@ class OllamaClient:
         if system_prompt:
             payload["system"] = system_prompt
 
+        print(f"[LLM] Calling {self.model} with prompt length: {len(prompt)}")
+
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(url, json=payload)
                 response.raise_for_status()
                 data = response.json()
-                return data.get("response", "")
+
+                result = data.get("response", "")
+                print(f"[LLM] Response length: {len(result)}")
+
+                # Handle empty response
+                if not result or not result.strip():
+                    print(f"[LLM] Empty response. Full data: {data}")
+                    return "I apologize, but I couldn't generate a response. Please try again."
+
+                return result.strip()
         except httpx.TimeoutException:
-            print(f"LLM request timed out after {self.timeout}s")
+            print(f"[LLM] Request timed out after {self.timeout}s")
             return None
         except httpx.HTTPStatusError as e:
-            print(f"LLM HTTP error: {e.response.status_code}")
+            print(f"[LLM] HTTP error: {e.response.status_code} - {e.response.text}")
             return None
         except httpx.ConnectError:
-            print("Could not connect to Ollama. Is it running?")
+            print("[LLM] Could not connect to Ollama. Is it running?")
             return None
         except Exception as e:
-            print(f"LLM error: {e}")
+            print(f"[LLM] Error: {type(e).__name__}: {e}")
             return None
 
     async def is_available(self) -> bool:

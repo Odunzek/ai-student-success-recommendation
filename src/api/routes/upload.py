@@ -23,20 +23,18 @@ router = APIRouter(prefix="/upload", tags=["Upload"])
 class UploadResponse(BaseModel):
     """Response model for upload endpoints."""
 
-    success: bool
     message: str
-    records_loaded: int
-    format_detected: str
-    missing_features: list[str] = []
+    rows_processed: int
+    filename: str
+    format_detected: str = ""
 
 
 class UploadStatusResponse(BaseModel):
     """Response model for upload status."""
 
-    source: str
-    record_count: int
-    features_available: list[str]
-    is_loaded: bool
+    has_data: bool
+    row_count: int
+    last_upload: str | None = None
 
 
 def ensure_upload_dir() -> Path:
@@ -108,9 +106,9 @@ async def upload_csv(
     loader.reload(output_path)
 
     return UploadResponse(
-        success=True,
-        message=f"Successfully loaded {len(df)} records from {file.filename}",
-        records_loaded=len(df),
+        message=f"Successfully loaded {len(df)} records",
+        rows_processed=len(df),
+        filename=file.filename or "unknown.csv",
         format_detected=format_detected,
     )
 
@@ -228,36 +226,31 @@ async def upload_oulad_files(
         files_uploaded.append("assessments.csv")
 
     return UploadResponse(
-        success=True,
-        message=f"Successfully processed {len(df)} records from OULAD files: {', '.join(files_uploaded)}",
-        records_loaded=len(df),
+        message=f"Successfully processed {len(df)} records from OULAD files",
+        rows_processed=len(df),
+        filename=", ".join(files_uploaded),
         format_detected="oulad_separate",
     )
 
 
 @router.get("/status", response_model=UploadStatusResponse)
 async def get_upload_status():
-    """Get current dataset information.
-
-    Returns the current data source, record count, and available features.
-    """
+    """Get current dataset information."""
     loader = get_data_loader()
 
     if not loader.is_loaded:
         return UploadStatusResponse(
-            source="none",
-            record_count=0,
-            features_available=[],
-            is_loaded=False,
+            has_data=False,
+            row_count=0,
+            last_upload=None,
         )
 
     source_info = loader.get_source_info()
 
     return UploadStatusResponse(
-        source=source_info["source"],
-        record_count=source_info["record_count"],
-        features_available=source_info["features"],
-        is_loaded=True,
+        has_data=True,
+        row_count=source_info["record_count"],
+        last_upload=source_info["source"],
     )
 
 

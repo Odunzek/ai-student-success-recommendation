@@ -30,13 +30,8 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[WARN] Could not load SHAP explainer: {e}")
 
-    # Load student data
-    loader = get_data_loader()
-    try:
-        loader.load()
-        print(f"[OK] Student data loaded from {settings.student_data_path}")
-    except Exception as e:
-        print(f"[WARN] Could not load student data: {e}")
+    # Don't auto-load student data - user will upload via /upload endpoint
+    print("[INFO] No data auto-loaded. Upload CSV via /api/v1/upload/csv")
 
     yield
 
@@ -84,7 +79,12 @@ def create_app() -> FastAPI:
     @app.get("/health", tags=["Health"])
     async def health_check():
         """Health check endpoint."""
-        return {"status": "healthy"}
+        return {"status": "healthy", "model_loaded": get_predictor().is_loaded}
+
+    @app.get(f"{settings.api_prefix}/health", tags=["Health"])
+    async def api_health_check():
+        """Health check endpoint under API prefix."""
+        return {"status": "healthy", "model_loaded": get_predictor().is_loaded}
 
     return app
 
