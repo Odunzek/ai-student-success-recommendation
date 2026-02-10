@@ -1,19 +1,28 @@
 import { useState } from 'react'
-import { Trash2, CheckCircle } from 'lucide-react'
+import { Trash2, CheckCircle, FileSpreadsheet, FolderOpen } from 'lucide-react'
 import { Dropzone } from '../components/upload/Dropzone'
+import { OuladUploader } from '../components/upload/OuladUploader'
 import { DatasetInfo } from '../components/upload/DatasetInfo'
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Alert } from '../components/ui/Alert'
 import { LoadingState } from '../components/ui/Spinner'
-import { useUpload, useUploadStatus, useResetData } from '../api/hooks/useUpload'
+import { useUpload, useUploadOulad, useUploadStatus, useResetData } from '../api/hooks/useUpload'
+import { cn } from '../lib/utils'
+
+type UploadMode = 'single' | 'oulad'
 
 export function DataTab() {
+  const [uploadMode, setUploadMode] = useState<UploadMode>('single')
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null)
+  const [resetSuccess, setResetSuccess] = useState(false)
 
   const { data: status, isLoading: statusLoading, isError: statusError } = useUploadStatus()
   const upload = useUpload()
+  const uploadOulad = useUploadOulad()
   const reset = useResetData()
+
+  const isUploading = upload.isPending || uploadOulad.isPending
 
   const handleFileSelect = async (file: File) => {
     setUploadSuccess(null)
@@ -25,10 +34,32 @@ export function DataTab() {
     }
   }
 
+  const handleOuladUpload = async (files: { [key: string]: File }) => {
+    setUploadSuccess(null)
+    try {
+      const result = await uploadOulad.mutateAsync({
+        studentInfo: files.studentInfo,
+        studentAssessment: files.studentAssessment,
+        studentVle: files.studentVle,
+        assessments: files.assessments,
+      })
+      setUploadSuccess(`Successfully processed ${result.rows_processed} records from OULAD files`)
+    } catch {
+      // Error is handled by the mutation
+    }
+  }
+
   const handleReset = async () => {
-    if (window.confirm('Are you sure you want to delete all data? This cannot be undone.')) {
+    const confirmed = window.confirm('Are you sure you want to delete all data? This cannot be undone.')
+    if (confirmed) {
       setUploadSuccess(null)
-      await reset.mutateAsync()
+      setResetSuccess(false)
+      try {
+        await reset.mutateAsync()
+        setResetSuccess(true)
+      } catch (error) {
+        console.error('Reset failed:', error)
+      }
     }
   }
 
@@ -40,26 +71,90 @@ export function DataTab() {
           <CardHeader>
             <CardTitle>Upload Dataset</CardTitle>
             <CardDescription>
-              Upload a CSV file with student data to analyze dropout risk
+              Upload student data to analyze dropout risk
             </CardDescription>
           </CardHeader>
 
           <div className="space-y-4">
-            <Dropzone
-              onFileSelect={handleFileSelect}
-              disabled={upload.isPending}
-            />
+            {/* Upload Mode Toggle */}
+            <div className="flex rounded-lg bg-surface-100 dark:bg-surface-800 p-1">
+              <button
+                onClick={() => setUploadMode('single')}
+                disabled={isUploading}
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors',
+                  uploadMode === 'single'
+                    ? 'bg-white dark:bg-surface-900 text-surface-900 dark:text-white shadow-sm'
+                    : 'text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white',
+                  isUploading && 'opacity-50 cursor-not-allowed'
+                )}
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                Single File
+              </button>
+              <button
+                onClick={() => setUploadMode('oulad')}
+                disabled={isUploading}
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors',
+                  uploadMode === 'oulad'
+                    ? 'bg-white dark:bg-surface-900 text-surface-900 dark:text-white shadow-sm'
+                    : 'text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white',
+                  isUploading && 'opacity-50 cursor-not-allowed'
+                )}
+              >
+                <FolderOpen className="h-4 w-4" />
+                OULAD Files
+              </button>
+            </div>
 
-            {upload.isPending && (
-              <LoadingState message="Processing file..." />
+            {/* Single File Upload */}
+            {uploadMode === 'single' && (
+              <>
+                <Dropzone
+                  onFileSelect={handleFileSelect}
+                  disabled={upload.isPending}
+                />
+
+                {upload.isPending && (
+                  <LoadingState message="Processing file..." />
+                )}
+
+                {upload.isError && (
+                  <Alert variant="error" title="Upload Failed">
+                    {upload.error?.message || 'Failed to upload file. Please check the format and try again.'}
+                  </Alert>
+                )}
+
+                <div className="text-sm text-surface-500 dark:text-surface-400">
+                  <p className="font-medium mb-2">Accepted Formats:</p>
+                  <ul className="list-disc list-inside space-y-1 text-xs">
+                    <li><strong>Pre-processed CSV:</strong> With model features (avg_score, completion_rate, etc.)</li>
+                    <li><strong>Combined OULAD CSV:</strong> Raw data with id_student, score, sum_click columns</li>
+                    <li><strong>ZIP file:</strong> Contains OULAD CSVs (studentInfo, studentAssessment, etc.)</li>
+                  </ul>
+                </div>
+              </>
             )}
 
-            {upload.isError && (
-              <Alert variant="error" title="Upload Failed">
-                {upload.error?.message || 'Failed to upload file. Please check the format and try again.'}
-              </Alert>
+            {/* OULAD Multi-File Upload */}
+            {uploadMode === 'oulad' && (
+              <>
+                <OuladUploader
+                  onUpload={handleOuladUpload}
+                  disabled={uploadOulad.isPending}
+                  isLoading={uploadOulad.isPending}
+                />
+
+                {uploadOulad.isError && (
+                  <Alert variant="error" title="Upload Failed">
+                    {uploadOulad.error?.message || 'Failed to process OULAD files. Please check the format and try again.'}
+                  </Alert>
+                )}
+              </>
             )}
 
+            {/* Success Message (shared) */}
             {uploadSuccess && (
               <Alert variant="success" title="Upload Complete">
                 <div className="flex items-center gap-2">
@@ -68,15 +163,6 @@ export function DataTab() {
                 </div>
               </Alert>
             )}
-
-            <div className="text-sm text-surface-500 dark:text-surface-400">
-              <p className="font-medium mb-2">Expected CSV Format:</p>
-              <ul className="list-disc list-inside space-y-1 text-xs">
-                <li>Headers: student_id, gender, age, address, family_size, etc.</li>
-                <li>Grades: g1, g2, g3 (0-20)</li>
-                <li>Boolean fields: yes/no or 1/0</li>
-              </ul>
-            </div>
           </div>
         </Card>
 
@@ -119,6 +205,11 @@ export function DataTab() {
               {reset.isError && (
                 <Alert variant="error" className="mt-4">
                   Failed to reset data. Please try again.
+                </Alert>
+              )}
+              {resetSuccess && (
+                <Alert variant="success" className="mt-4">
+                  All data cleared. Upload a new dataset to continue.
                 </Alert>
               )}
             </Card>

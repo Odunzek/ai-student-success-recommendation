@@ -88,11 +88,22 @@ def transform_oulad(dfs: dict[str, pd.DataFrame]) -> pd.DataFrame:
     Returns:
         Transformed DataFrame with required features
     """
-    # Extract DataFrames
-    student_info = dfs.get("studentInfo.csv") or dfs.get("studentInfo")
-    student_assessment = dfs.get("studentAssessment.csv") or dfs.get("studentAssessment")
-    student_vle = dfs.get("studentVle.csv") or dfs.get("studentVle")
-    assessments = dfs.get("assessments.csv") or dfs.get("assessments")
+    # Extract DataFrames - use explicit None checks to avoid DataFrame truth value ambiguity
+    student_info = dfs.get("studentInfo.csv")
+    if student_info is None:
+        student_info = dfs.get("studentInfo")
+
+    student_assessment = dfs.get("studentAssessment.csv")
+    if student_assessment is None:
+        student_assessment = dfs.get("studentAssessment")
+
+    student_vle = dfs.get("studentVle.csv")
+    if student_vle is None:
+        student_vle = dfs.get("studentVle")
+
+    assessments = dfs.get("assessments.csv")
+    if assessments is None:
+        assessments = dfs.get("assessments")
 
     if student_info is None:
         raise ValueError("studentInfo.csv is required")

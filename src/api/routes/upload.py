@@ -270,12 +270,11 @@ async def get_upload_status():
 
 @router.delete("/data")
 async def clear_uploaded_data():
-    """Clear uploaded data and reload default dataset.
+    """Clear all uploaded data.
 
-    This will remove any uploaded data and reload the original dataset
-    from the configured path.
+    This will remove any uploaded data and reset the system to empty state.
+    Users will need to upload new data to use the platform.
     """
-    settings = get_settings()
     loader = get_data_loader()
 
     # Clear uploaded file if exists
@@ -284,17 +283,11 @@ async def clear_uploaded_data():
     if uploaded_file.exists():
         uploaded_file.unlink()
 
-    # Reload default data
-    try:
-        loader.reload(settings.student_data_path)
-        return {
-            "success": True,
-            "message": "Data cleared. Default dataset reloaded.",
-            "records_loaded": len(loader.data) if loader.is_loaded else 0,
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "message": f"Failed to reload default data: {str(e)}",
-            "records_loaded": 0,
-        }
+    # Clear data from memory
+    loader.clear()
+
+    return {
+        "success": True,
+        "message": "All data cleared. Upload a new dataset to continue.",
+        "records_loaded": 0,
+    }

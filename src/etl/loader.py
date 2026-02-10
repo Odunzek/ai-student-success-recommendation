@@ -48,6 +48,14 @@ class StudentDataLoader:
         """
         self.load(path)
 
+    def clear(self) -> None:
+        """Clear all loaded data from memory.
+
+        Resets the loader to empty state - no data loaded.
+        """
+        self._data = None
+        self._source_path = None
+
     def get_source_info(self) -> dict:
         """Get information about the current data source.
 
@@ -92,7 +100,7 @@ class StudentDataLoader:
         """Get a student record by ID.
 
         Args:
-            student_id: Student identifier (row index as string)
+            student_id: Student identifier (can be row index or actual student_id value)
 
         Returns:
             Dict of student data or None if not found
@@ -100,6 +108,23 @@ class StudentDataLoader:
         if not self.is_loaded:
             return None
 
+        # Try matching on student_id column first (most common case)
+        if "student_id" in self._data.columns:
+            # Try both string and numeric comparison
+            matches = self._data[self._data["student_id"].astype(str) == str(student_id)]
+            if len(matches) > 0:
+                return matches.iloc[0].to_dict()
+
+            # Also try numeric match if student_id looks like a number
+            try:
+                numeric_id = int(student_id)
+                matches = self._data[self._data["student_id"] == numeric_id]
+                if len(matches) > 0:
+                    return matches.iloc[0].to_dict()
+            except (ValueError, TypeError):
+                pass
+
+        # Fall back to row index lookup
         try:
             idx = int(student_id)
             if 0 <= idx < len(self._data):
@@ -107,12 +132,6 @@ class StudentDataLoader:
                 return row.to_dict()
         except (ValueError, IndexError):
             pass
-
-        # Try matching on student_id column if exists
-        if "student_id" in self._data.columns:
-            matches = self._data[self._data["student_id"] == student_id]
-            if len(matches) > 0:
-                return matches.iloc[0].to_dict()
 
         return None
 

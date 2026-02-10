@@ -1,11 +1,14 @@
 """Student data endpoint routes."""
 
 from fastapi import APIRouter, HTTPException, Query
+import numpy as np
 
 from src.etl.loader import get_data_loader
 from src.models.predictor import get_predictor
+from src.models.explainer import get_explainer
 from src.api.schemas.student import StudentFeatures
 from src.api.schemas.prediction import PredictionResponse
+from src.config import get_settings
 
 router = APIRouter(prefix="/students", tags=["Students"])
 
@@ -142,44 +145,79 @@ async def predict_student_risk(student_id: str):
         )
 
     try:
-        # Extract features from student data
-        features = StudentFeatures(
-            num_of_prev_attempts=int(student.get("num_of_prev_attempts", 0)),
-            studied_credits=int(student.get("studied_credits", 60)),
-            avg_score=float(student.get("avg_score", 50)),
-            total_clicks=int(student.get("total_clicks", 0)),
-            completion_rate=float(student.get("completion_rate", 0.5)),
-            module_BBB=False,
-            module_CCC=False,
-            module_DDD=False,
-            module_EEE=False,
-            module_FFF=False,
-            module_GGG=False,
-        )
+        settings = get_settings()
 
-        result = predictor.predict(features.model_dump())
+        # Extract features from student data
+        feature_data = {
+            "num_of_prev_attempts": int(student.get("num_of_prev_attempts", 0)),
+            "studied_credits": int(student.get("studied_credits", 60)),
+            "avg_score": float(student.get("avg_score", 50)),
+            "total_clicks": int(student.get("total_clicks", 0)),
+            "completion_rate": float(student.get("completion_rate", 0.5)),
+            "module_BBB": int(student.get("module_BBB", 0)),
+            "module_CCC": int(student.get("module_CCC", 0)),
+            "module_DDD": int(student.get("module_DDD", 0)),
+            "module_EEE": int(student.get("module_EEE", 0)),
+            "module_FFF": int(student.get("module_FFF", 0)),
+            "module_GGG": int(student.get("module_GGG", 0)),
+        }
+
+        result = predictor.predict(feature_data)
 
         # Convert to frontend expected format
         risk_probability = result.get("risk_probability", 0)
         risk_level = result.get("risk_level", "low")
 
-        # Generate SHAP factors from top_factors if available, otherwise mock
+        # Try to get real SHAP values from the explainer
         shap_factors = []
-        top_factors = result.get("top_factors", [])
-        if top_factors:
-            for factor in top_factors:
-                shap_factors.append({
-                    "feature": factor.get("feature", "unknown"),
-                    "value": student.get(factor.get("feature", ""), 0),
-                    "impact": abs(factor.get("impact", 0)),
-                    "direction": "positive" if factor.get("impact", 0) > 0 else "negative",
-                })
-        else:
-            # Generate mock factors based on student data
+        explainer = get_explainer()
+
+        if explainer.is_loaded:
+            try:
+                # Prepare features array for SHAP
+                numeric_features = settings.numeric_features
+                module_features = settings.module_features
+
+                numeric_values = [float(feature_data.get(f, 0)) for f in numeric_features]
+                module_values = [int(feature_data.get(f, 0)) for f in module_features]
+                features_array = np.array(numeric_values + module_values).reshape(1, -1)
+
+                # Get real SHAP explanations
+                top_factors = explainer.explain(features_array)
+
+                # Calculate total absolute SHAP to normalize to percentages
+                total_abs_shap = sum(abs(f["impact"]) for f in top_factors)
+
+                for factor in top_factors[:3]:  # Top 3 factors
+                    feature_name = factor["feature"]
+                    impact = factor["impact"]
+                    # Normalize: convert to proportion of total impact, scale to 0-0.30 range
+                    # This gives reasonable percentages like 5-30%
+                    if total_abs_shap > 0:
+                        normalized_impact = (abs(impact) / total_abs_shap) * 0.30
+                    else:
+                        normalized_impact = 0.10
+                    shap_factors.append({
+                        "feature": feature_name,
+                        "value": feature_data.get(feature_name, 0),
+                        "impact": round(normalized_impact, 4),
+                        "direction": "positive" if impact > 0 else "negative",
+                    })
+            except Exception as shap_error:
+                print(f"SHAP explanation failed: {shap_error}")
+                # Fall back to mock values
+                shap_factors = []
+
+        # Fallback if SHAP not available
+        if not shap_factors:
+            avg_score = student.get("avg_score", 50)
+            completion_rate = student.get("completion_rate", 0.5)
+            total_clicks = student.get("total_clicks", 0)
+
             shap_factors = [
-                {"feature": "avg_score", "value": student.get("avg_score", 50), "impact": 0.15, "direction": "negative" if student.get("avg_score", 50) > 60 else "positive"},
-                {"feature": "completion_rate", "value": student.get("completion_rate", 0.5), "impact": 0.12, "direction": "negative" if student.get("completion_rate", 0.5) > 0.7 else "positive"},
-                {"feature": "total_clicks", "value": student.get("total_clicks", 0), "impact": 0.08, "direction": "negative" if student.get("total_clicks", 0) > 1000 else "positive"},
+                {"feature": "avg_score", "value": avg_score, "impact": 0.15, "direction": "negative" if avg_score > 60 else "positive"},
+                {"feature": "completion_rate", "value": completion_rate, "impact": 0.12, "direction": "negative" if completion_rate > 0.7 else "positive"},
+                {"feature": "total_clicks", "value": total_clicks, "impact": 0.08, "direction": "negative" if total_clicks > 1000 else "positive"},
             ]
 
         return {

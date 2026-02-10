@@ -178,18 +178,45 @@ class RuleEngine:
                 ]
             })
 
-        # Add urgent contact for high risk
-        if risk_level == "high" and not any(i["priority"] == "critical" for i in interventions):
+        # Add urgent contact for high risk - ALWAYS for high risk students
+        if risk_level == "high":
             interventions.insert(0, {
                 "type": "urgent",
                 "priority": "critical",
                 "title": "High Risk - Immediate Contact Required",
-                "description": "Student is identified as high risk. Proactive personal contact recommended.",
+                "description": f"Student has a {risk_score}% risk score indicating high likelihood of withdrawal or failure. Proactive personal contact recommended immediately.",
                 "actions": [
-                    "Direct phone call or video meeting",
+                    "Direct phone call or video meeting within 24 hours",
                     "Understand current situation and barriers",
                     "Create comprehensive support plan",
                     "Schedule regular follow-ups",
+                ]
+            })
+            # Also add comprehensive support for high risk
+            if not issues:
+                issues.append("high overall risk score despite acceptable individual metrics")
+                interventions.append({
+                    "type": "academic",
+                    "priority": "high",
+                    "title": "Comprehensive Risk Assessment",
+                    "description": "Individual metrics appear acceptable but overall risk model indicates concern. Deeper investigation needed.",
+                    "actions": [
+                        "Review attendance and participation patterns",
+                        "Check for external factors affecting performance",
+                        "Assess mental health and wellbeing",
+                        "Compare with historical patterns of at-risk students",
+                    ]
+                })
+        elif risk_level == "medium" and not interventions:
+            interventions.append({
+                "type": "support",
+                "priority": "medium",
+                "title": "Proactive Monitoring",
+                "description": f"Student has a {risk_score}% risk score. Proactive monitoring recommended.",
+                "actions": [
+                    "Schedule check-in meeting",
+                    "Monitor upcoming assessment submissions",
+                    "Ensure student knows support is available",
                 ]
             })
 

@@ -99,7 +99,7 @@ export function ChatInterface({
             onKeyDown={handleKeyDown}
             placeholder={isAvailable ? "Type your message..." : "Chat unavailable"}
             disabled={!isAvailable || isLoading}
-            className="flex-1 resize-none rounded-lg border border-surface-300 dark:border-surface-700 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-surface-50 dark:disabled:bg-surface-800 disabled:cursor-not-allowed"
+            className="flex-1 resize-none rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-white placeholder:text-surface-400 dark:placeholder:text-surface-500 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-surface-50 dark:disabled:bg-surface-800 disabled:cursor-not-allowed"
             rows={1}
           />
           <Button

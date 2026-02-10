@@ -112,62 +112,80 @@ class HybridEngine:
         """Merge LLM response with rule-based result.
 
         Parses the detailed intervention format with Why, Action, Owner, Timeline, Success fields.
+        Handles various LLM output formats flexibly.
         """
         result = rule_result.copy()
         result["llm_enhanced"] = True
 
-        # Parse summary
+        # Parse summary - handle various formats
+        # Only overwrite if LLM provides a valid summary with correct risk context
         summary_match = re.search(r"SUMMARY:\s*(.+?)(?=INTERVENTIONS:|$)", llm_response, re.DOTALL | re.IGNORECASE)
         if summary_match:
-            result["summary"] = summary_match.group(1).strip()
+            parsed_summary = self._clean_text(summary_match.group(1))
+            # Only use LLM summary if it's substantial (>20 chars) and doesn't contradict risk level
+            rule_risk_level = rule_result.get("risk_level", "").lower()
+            # Check if summary mentions a DIFFERENT risk level (which would be wrong)
+            wrong_risk_levels = {"low", "medium", "high"} - {rule_risk_level}
+            has_wrong_risk = any(f"{wrong} risk" in parsed_summary.lower() for wrong in wrong_risk_levels)
+            if len(parsed_summary) > 20 and not has_wrong_risk:
+                result["summary"] = parsed_summary
+            # Otherwise keep the rule-based summary (don't overwrite)
 
         # Parse detailed interventions
         interventions_match = re.search(r"INTERVENTIONS:\s*(.+)", llm_response, re.DOTALL | re.IGNORECASE)
         if interventions_match:
             enhanced_text = interventions_match.group(1)
 
-            # Match each numbered intervention block with its details
-            # Pattern: 1. **Title** followed by Why:, Action:, etc.
-            intervention_blocks = re.split(r'\n\s*\d+\.\s*\*\*', enhanced_text)
+            # Split by numbered items - handle various formats: "1.", "1)", "1:"
+            intervention_blocks = re.split(r'\n\s*\d+[\.\)\:]\s*', enhanced_text)
 
             new_interventions = []
-            for i, block in enumerate(intervention_blocks[1:], 0):  # Skip first empty split
+            for i, block in enumerate(intervention_blocks[1:], 1):  # Skip first empty split
                 if not block.strip():
                     continue
 
-                # Parse title (before the closing **)
-                title_match = re.match(r'([^*]+)\*\*', block)
-                title = title_match.group(1).strip() if title_match else f"Intervention {i+1}"
+                # Parse title - handle **Title**, [Title], or just first line
+                title_match = re.match(r'\*\*([^*]+)\*\*', block)
+                if not title_match:
+                    title_match = re.match(r'\[([^\]]+)\]', block)
+                if not title_match:
+                    # Take first line as title
+                    first_line = block.split('\n')[0].strip()
+                    title = re.sub(r'[\*\[\]#]', '', first_line)[:50]  # Clean and limit
+                else:
+                    title = title_match.group(1).strip()
 
-                # Parse the details
-                why_match = re.search(r'Why:\s*(.+?)(?=Action:|Owner:|Timeline:|Success:|$)', block, re.DOTALL | re.IGNORECASE)
-                action_match = re.search(r'Action:\s*(.+?)(?=Why:|Owner:|Timeline:|Success:|$)', block, re.DOTALL | re.IGNORECASE)
-                owner_match = re.search(r'Owner:\s*(.+?)(?=Why:|Action:|Timeline:|Success:|$)', block, re.DOTALL | re.IGNORECASE)
-                timeline_match = re.search(r'Timeline:\s*(.+?)(?=Why:|Action:|Owner:|Success:|$)', block, re.DOTALL | re.IGNORECASE)
-                success_match = re.search(r'Success:\s*(.+?)(?=Why:|Action:|Owner:|Timeline:|$)', block, re.DOTALL | re.IGNORECASE)
+                if not title:
+                    title = f"Intervention {i}"
 
-                # Build detailed description
-                description_parts = []
-                if why_match:
-                    description_parts.append(why_match.group(1).strip())
+                # Parse fields - handle **Why:**, - Why:, Why:, etc.
+                why_match = re.search(r'[\*\-]*\s*Why:?\*?\*?\s*(.+?)(?=[\*\-]*\s*Action|[\*\-]*\s*Owner|[\*\-]*\s*Timeline|[\*\-]*\s*Success|$)', block, re.DOTALL | re.IGNORECASE)
+                action_match = re.search(r'[\*\-]*\s*Action:?\*?\*?\s*(.+?)(?=[\*\-]*\s*Why|[\*\-]*\s*Owner|[\*\-]*\s*Timeline|[\*\-]*\s*Success|$)', block, re.DOTALL | re.IGNORECASE)
+                owner_match = re.search(r'[\*\-]*\s*Ownership?:?\*?\*?\s*(.+?)(?=[\*\-]*\s*Why|[\*\-]*\s*Action|[\*\-]*\s*Timeline|[\*\-]*\s*Success|$)', block, re.DOTALL | re.IGNORECASE)
+                timeline_match = re.search(r'[\*\-]*\s*Timeline:?\*?\*?\s*(.+?)(?=[\*\-]*\s*Why|[\*\-]*\s*Action|[\*\-]*\s*Owner|[\*\-]*\s*Success|$)', block, re.DOTALL | re.IGNORECASE)
+                success_match = re.search(r'[\*\-]*\s*Success(?:\s*Metrics?)?:?\*?\*?\s*(.+?)(?=[\*\-]*\s*Why|[\*\-]*\s*Action|[\*\-]*\s*Owner|[\*\-]*\s*Timeline|$)', block, re.DOTALL | re.IGNORECASE)
+
+                # Build description from "Why" only (short explanation)
+                description = self._clean_text(why_match.group(1)) if why_match else ""
+
+                # Build actions array from the structured fields
+                actions = []
                 if action_match:
-                    description_parts.append(f"**Action:** {action_match.group(1).strip()}")
+                    actions.append(f"Action: {self._clean_text(action_match.group(1))}")
                 if owner_match:
-                    description_parts.append(f"**Owner:** {owner_match.group(1).strip()}")
+                    actions.append(f"Owner: {self._clean_text(owner_match.group(1))}")
                 if timeline_match:
-                    description_parts.append(f"**Timeline:** {timeline_match.group(1).strip()}")
+                    actions.append(f"Timeline: {self._clean_text(timeline_match.group(1))}")
                 if success_match:
-                    description_parts.append(f"**Success Metric:** {success_match.group(1).strip()}")
+                    actions.append(f"Success: {self._clean_text(success_match.group(1))}")
 
-                description = "\n".join(description_parts) if description_parts else block.strip()
-
-                # Determine priority based on timeline
+                # Determine priority based on timeline or content
                 priority = "medium"
                 if timeline_match:
                     timeline_text = timeline_match.group(1).lower()
-                    if "immediate" in timeline_text or "today" in timeline_text or "urgent" in timeline_text:
+                    if "immediate" in timeline_text or "today" in timeline_text or "urgent" in timeline_text or "24" in timeline_text:
                         priority = "critical"
-                    elif "this week" in timeline_text:
+                    elif "this week" in timeline_text or "7 day" in timeline_text:
                         priority = "high"
                     elif "ongoing" in timeline_text or "monthly" in timeline_text:
                         priority = "medium"
@@ -176,9 +194,9 @@ class HybridEngine:
                 intervention_type = "support"
                 lower_title = title.lower()
                 lower_desc = description.lower()
-                if any(w in lower_title or w in lower_desc for w in ["tutor", "study", "academic", "assessment", "grade"]):
+                if any(w in lower_title or w in lower_desc for w in ["tutor", "study", "academic", "assessment", "grade", "score", "review"]):
                     intervention_type = "academic"
-                elif any(w in lower_title or w in lower_desc for w in ["engage", "click", "activity", "participation", "attend"]):
+                elif any(w in lower_title or w in lower_desc for w in ["engage", "click", "activity", "participation", "attend", "quiz", "interactive"]):
                     intervention_type = "engagement"
                 elif any(w in lower_title or w in lower_desc for w in ["urgent", "critical", "immediate", "crisis"]):
                     intervention_type = "urgent"
@@ -188,7 +206,7 @@ class HybridEngine:
                     "priority": priority,
                     "title": title,
                     "description": description,
-                    "actions": [],  # Could be parsed separately if needed
+                    "actions": actions,
                 })
 
             # Use LLM interventions if we parsed any, otherwise keep rule-based
@@ -208,6 +226,18 @@ class HybridEngine:
                             result["interventions"][i]["description"] = enhanced_desc
 
         return result
+
+    def _clean_text(self, text: str) -> str:
+        """Clean extracted text by removing markdown and extra whitespace."""
+        if not text:
+            return ""
+        # Remove markdown bold/italic markers
+        text = re.sub(r'\*+', '', text)
+        # Remove leading dashes or bullets
+        text = re.sub(r'^[\-\•\*]+\s*', '', text.strip())
+        # Collapse whitespace
+        text = re.sub(r'\s+', ' ', text)
+        return text.strip()
 
 
 def get_hybrid_engine() -> HybridEngine:

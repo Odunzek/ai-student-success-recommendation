@@ -13,6 +13,26 @@ interface UploadStatus {
   last_upload?: string
 }
 
+interface OuladFiles {
+  studentInfo: File
+  studentAssessment?: File
+  studentVle?: File
+  assessments?: File
+}
+
+function invalidateAllDataQueries(queryClient: ReturnType<typeof useQueryClient>) {
+  // Invalidate all related queries to trigger immediate refetch
+  queryClient.invalidateQueries({ queryKey: ['upload', 'status'] })
+  queryClient.invalidateQueries({ queryKey: ['students'] })
+  // Explicitly invalidate all dashboard query keys
+  queryClient.invalidateQueries({ queryKey: ['dashboard', 'stats'] })
+  queryClient.invalidateQueries({ queryKey: ['dashboard', 'risk-summary'] })
+  queryClient.invalidateQueries({ queryKey: ['dashboard', 'trend'] })
+  // Force immediate refetch
+  queryClient.refetchQueries({ queryKey: ['dashboard'] })
+  queryClient.refetchQueries({ queryKey: ['upload', 'status'] })
+}
+
 export function useUpload() {
   const queryClient = useQueryClient()
 
@@ -22,18 +42,29 @@ export function useUpload() {
       formData.append('file', file)
       return api.postForm<UploadResponse>('/upload/csv', formData)
     },
-    onSuccess: () => {
-      // Invalidate all related queries to trigger immediate refetch
-      queryClient.invalidateQueries({ queryKey: ['upload', 'status'] })
-      queryClient.invalidateQueries({ queryKey: ['students'] })
-      // Explicitly invalidate all dashboard query keys
-      queryClient.invalidateQueries({ queryKey: ['dashboard', 'stats'] })
-      queryClient.invalidateQueries({ queryKey: ['dashboard', 'risk-summary'] })
-      queryClient.invalidateQueries({ queryKey: ['dashboard', 'trend'] })
-      // Force immediate refetch
-      queryClient.refetchQueries({ queryKey: ['dashboard'] })
-      queryClient.refetchQueries({ queryKey: ['upload', 'status'] })
+    onSuccess: () => invalidateAllDataQueries(queryClient),
+  })
+}
+
+export function useUploadOulad() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (files: OuladFiles) => {
+      const formData = new FormData()
+      formData.append('student_info', files.studentInfo)
+      if (files.studentAssessment) {
+        formData.append('student_assessment', files.studentAssessment)
+      }
+      if (files.studentVle) {
+        formData.append('student_vle', files.studentVle)
+      }
+      if (files.assessments) {
+        formData.append('assessments', files.assessments)
+      }
+      return api.postForm<UploadResponse>('/upload/oulad', formData)
     },
+    onSuccess: () => invalidateAllDataQueries(queryClient),
   })
 }
 

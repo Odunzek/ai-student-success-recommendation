@@ -93,7 +93,7 @@ export function InterventionTab() {
     if (!selectedStudent || !prediction) return
 
     const interventionInput = {
-      risk_score: Math.round(prediction.dropout_probability),
+      risk_score: Math.round(prediction.dropout_probability * 100),
       completion_rate: selectedStudent.completion_rate ?? 0.5,
       avg_score: selectedStudent.avg_score ?? 50,
       total_clicks: selectedStudent.total_clicks ?? 0,
@@ -249,10 +249,10 @@ export function InterventionTab() {
                   </p>
                   <p className="text-sm text-surface-500 dark:text-surface-400 mt-1">
                     Risk Level: <span className={`font-medium ${
-                      prediction.risk_level === 'high' ? 'text-red-500' :
-                      prediction.risk_level === 'medium' ? 'text-amber-500' : 'text-green-500'
+                      (interventionResult?.risk_level || prediction.risk_level) === 'high' ? 'text-red-500' :
+                      (interventionResult?.risk_level || prediction.risk_level) === 'medium' ? 'text-amber-500' : 'text-green-500'
                     }`}>
-                      {prediction.risk_level?.toUpperCase()}
+                      {(interventionResult?.risk_level || prediction.risk_level)?.toUpperCase()}
                     </span>
                   </p>
                 </div>

@@ -297,7 +297,7 @@ export function ChatTab() {
                   onFocus={() => studentSearchQuery && setShowStudentDropdown(true)}
                   onBlur={() => setTimeout(() => setShowStudentDropdown(false), 200)}
                   placeholder="Search by student ID..."
-                  className="w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-sm pr-8 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  className="w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-white placeholder:text-surface-400 dark:placeholder:text-surface-500 px-3 py-2 text-sm pr-8 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 />
                 <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-400" />
               </div>

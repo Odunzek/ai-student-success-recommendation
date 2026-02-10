@@ -58,7 +58,7 @@ export function AlertsTable({ alerts, onViewProfile }: AlertsTableProps) {
       >
         {alerts.map((alert, index) => (
           <motion.div
-            key={alert.studentId + index}
+            key={String(alert.studentId) + index}
             className={cn(
               'relative flex items-center gap-4 px-6 py-4',
               'hover:bg-surface-800/30 transition-colors group'
@@ -74,7 +74,7 @@ export function AlertsTable({ alerts, onViewProfile }: AlertsTableProps) {
                 <User className="h-4 w-4 text-surface-400" />
               </div>
               <div>
-                <p className="text-sm font-medium text-white">Student ID: {alert.studentId}</p>
+                <p className="text-sm font-medium text-white">Student ID: {String(alert.studentId)}</p>
                 <Badge variant={riskBadgeVariant[alert.riskLevel]} size="sm">
                   {alert.riskLevel.charAt(0).toUpperCase() + alert.riskLevel.slice(1)} Risk
                 </Badge>
@@ -94,8 +94,8 @@ export function AlertsTable({ alerts, onViewProfile }: AlertsTableProps) {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onViewProfile(alert.studentId)}
-              disabled={alert.studentId.startsWith('Group:')}
+              onClick={() => onViewProfile(String(alert.studentId))}
+              disabled={String(alert.studentId).startsWith('Group:')}
               className="opacity-70 group-hover:opacity-100 transition-opacity"
             >
               View Profile
