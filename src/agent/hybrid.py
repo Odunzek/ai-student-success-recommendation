@@ -4,7 +4,7 @@ import re
 
 from src.config import get_settings
 from src.agent.rules import RuleEngine, get_rule_engine
-from src.agent.llm_client import OllamaClient, get_llm_client
+from src.agent.llm_client import OpenAIClient, OllamaClient, get_llm_client
 from src.agent.prompts import SYSTEM_PROMPT, create_intervention_prompt
 
 
@@ -20,7 +20,7 @@ class HybridEngine:
     def __init__(
         self,
         rule_engine: RuleEngine | None = None,
-        llm_client: OllamaClient | None = None,
+        llm_client: OpenAIClient | OllamaClient | None = None,
     ):
         self.rule_engine = rule_engine or get_rule_engine()
         self.llm_client = llm_client or get_llm_client()

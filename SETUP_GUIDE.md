@@ -6,7 +6,7 @@ This guide walks you through setting up and running the AI-powered Student Succe
 
 - **Python 3.10+**
 - **Node.js 16+** with npm
-- **Ollama** (optional, for LLM-enhanced interventions)
+- **OpenAI API key** or **Ollama** (optional, for LLM-enhanced interventions)
 
 ---
 
@@ -46,11 +46,18 @@ API_VERSION=1.0.0
 API_PREFIX=/api/v1
 DEBUG=false
 
-# LLM Settings (Ollama)
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=deepseek-r1:1.5b
+# LLM Provider: "openai" or "ollama"
+LLM_PROVIDER=openai
 LLM_TIMEOUT=30.0
 LLM_ENABLED=true
+
+# OpenAI Settings (if LLM_PROVIDER=openai)
+OPENAI_API_KEY=sk-your-api-key-here
+OPENAI_MODEL=gpt-4o-mini
+
+# Ollama Settings (if LLM_PROVIDER=ollama)
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=deepseek-r1:1.5b
 ```
 
 ### 3. Start Backend Server
@@ -84,7 +91,21 @@ VITE v5.4.7 ready
   Local:   http://localhost:5173/
 ```
 
-### 5. (Optional) Start Ollama for LLM Features
+### 5. (Optional) Configure LLM for AI Features
+
+The platform supports two LLM providers:
+
+#### Option A: OpenAI API (Recommended)
+
+1. Get an API key from [OpenAI Platform](https://platform.openai.com/api-keys)
+2. Add to your `.env` file:
+```env
+LLM_PROVIDER=openai
+OPENAI_API_KEY=sk-your-api-key-here
+OPENAI_MODEL=gpt-4o-mini
+```
+
+#### Option B: Ollama (Local/Free)
 
 ```bash
 # Install Ollama from https://ollama.ai
@@ -92,7 +113,12 @@ ollama pull deepseek-r1:1.5b
 ollama serve
 ```
 
-Without Ollama, the system uses rule-based interventions only.
+Then set in `.env`:
+```env
+LLM_PROVIDER=ollama
+```
+
+Without an LLM provider, the system uses rule-based interventions only.
 
 ---
 
@@ -210,8 +236,10 @@ proxy: {
 }
 ```
 
-### Ollama connection refused
-Either start Ollama (`ollama serve`) or disable LLM features in requests.
+### LLM not working
+- **OpenAI**: Verify `OPENAI_API_KEY` is set correctly in `.env`
+- **Ollama**: Start with `ollama serve` or set `LLM_PROVIDER=openai`
+- Check `LLM_ENABLED=true` in `.env`
 
 ### Port already in use
 Backend: `uvicorn src.api.main:app --port 8001`
@@ -225,7 +253,7 @@ Frontend: `npm run dev -- --port 5174`
 - FastAPI (REST API)
 - XGBoost (risk prediction)
 - SHAP (model explainability)
-- Ollama/DeepSeek (LLM interventions)
+- OpenAI/Ollama (LLM interventions)
 
 **Frontend:**
 - React 18 + TypeScript

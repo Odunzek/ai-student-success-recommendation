@@ -191,7 +191,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
     is_available = await llm_client.is_available()
     if not is_available:
         return ChatResponse(
-            response="AI assistant unavailable. Please ensure Ollama is running with: ollama serve",
+            response="AI assistant unavailable. Please check LLM configuration (OpenAI API key or Ollama service).",
             llm_available=False,
             session_id=session_id,
             flagged=is_suspicious,

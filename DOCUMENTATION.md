@@ -395,9 +395,22 @@ models/
 
 ## LLM Integration
 
-### Ollama Setup
+The platform supports two LLM providers for AI-enhanced interventions and chat.
 
-The app uses Ollama to run local LLMs for intervention personalization.
+### Option A: OpenAI API (Recommended)
+
+**Default Model:** `gpt-4o-mini`
+
+**Setup:**
+1. Get an API key from [OpenAI Platform](https://platform.openai.com/api-keys)
+2. Add to your `.env` file:
+```env
+LLM_PROVIDER=openai
+OPENAI_API_KEY=sk-your-api-key-here
+OPENAI_MODEL=gpt-4o-mini
+```
+
+### Option B: Ollama (Local/Free)
 
 **Default Model:** `deepseek-r1:1.5b`
 
@@ -411,6 +424,13 @@ ollama pull deepseek-r1:1.5b
 
 # Start server
 ollama serve
+```
+
+Then set in `.env`:
+```env
+LLM_PROVIDER=ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=deepseek-r1:1.5b
 ```
 
 ### Prompts
@@ -448,11 +468,16 @@ Keep responses concise (2-4 sentences). Be helpful and practical.
 
 ### Graceful Degradation
 
-If Ollama is unavailable:
-1. `is_available()` returns false
-2. Intervention endpoint uses rules-only
+If no LLM provider is available:
+1. `is_available()` returns false (missing API key or Ollama not running)
+2. Intervention endpoint uses rules-only mode
 3. Chat endpoint returns "AI assistant unavailable" message
 4. App continues to function without LLM features
+
+**Provider Selection Logic:**
+- If `LLM_PROVIDER=openai` and `OPENAI_API_KEY` is set → Use OpenAI
+- If `LLM_PROVIDER=ollama` or OpenAI not configured → Use Ollama
+- If neither available → Fall back to rules-only
 
 ---
 

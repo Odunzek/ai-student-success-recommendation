@@ -17,5 +17,8 @@ shap>=0.42.0
 # HTTP client for LLM
 httpx>=0.24.0
 
+# OpenAI API
+openai>=1.0.0
+
 # Environment variables
 python-dotenv>=1.0.0

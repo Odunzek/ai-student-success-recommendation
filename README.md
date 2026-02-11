@@ -32,7 +32,7 @@ AI-powered student risk prediction and intervention recommendation system.
 
 - Python 3.11+
 - Node.js 18+
-- Ollama (for LLM features)
+- OpenAI API key or Ollama (optional, for LLM features)
 
 ### Backend Setup
 
@@ -55,11 +55,32 @@ npm run dev
 
 ### LLM Setup (Optional)
 
+The platform supports two LLM providers for AI-enhanced interventions and chat:
+
+#### Option A: OpenAI API (Recommended)
+
+1. Get an API key from [OpenAI Platform](https://platform.openai.com/api-keys)
+2. Add to your `.env` file:
+```env
+LLM_PROVIDER=openai
+OPENAI_API_KEY=sk-your-api-key-here
+OPENAI_MODEL=gpt-4o-mini
+```
+
+#### Option B: Ollama (Local/Free)
+
 ```bash
 # Install Ollama from https://ollama.ai
 ollama pull deepseek-r1:1.5b
 ollama serve
 ```
+
+Then set in `.env`:
+```env
+LLM_PROVIDER=ollama
+```
+
+Without an LLM provider configured, the system uses rule-based interventions only.
 
 ## Configuration
 
@@ -70,24 +91,22 @@ Environment variables can be set in `.env` file:
 DEBUG=false
 API_PREFIX=/api/v1
 
-# LLM Settings
+# LLM Provider: "openai" or "ollama"
+LLM_PROVIDER=openai
+LLM_ENABLED=true
+LLM_TIMEOUT=30.0
+
+# OpenAI Settings (required if LLM_PROVIDER=openai)
+OPENAI_API_KEY=sk-your-api-key-here
+OPENAI_MODEL=gpt-4o-mini
+
+# Ollama Settings (used if LLM_PROVIDER=ollama)
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=deepseek-r1:1.5b
-LLM_ENABLED=true
-LLM_TIMEOUT=120.0
 
-# Risk Classification Thresholds (configurable)
+# Risk Classification Thresholds
 RISK_THRESHOLD_HIGH=70
 RISK_THRESHOLD_MEDIUM=40
-
-# Model Accuracy (set from training if known)
-MODEL_ACCURACY=0.91
-
-# Chat Settings
-CHAT_MAX_MESSAGES_PER_SESSION=50
-CHAT_SESSION_TIMEOUT_HOURS=24
-CHAT_RATE_LIMIT_REQUESTS=20
-CHAT_RATE_LIMIT_WINDOW=60
 ```
 
 ## API Endpoints
