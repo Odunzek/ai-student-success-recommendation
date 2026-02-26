@@ -114,6 +114,38 @@ export function StatCard({
     danger: 'hover:shadow-glow-danger',
   }
 
+  const titleColorVariants = {
+    default: 'text-surface-500 dark:text-surface-400',
+    primary:
+      'text-primary-800 dark:text-white font-semibold [text-shadow:0_1px_2px_rgba(0,0,0,0.08)] dark:[text-shadow:0_1px_3px_rgba(0,0,0,0.3)]',
+    success:
+      'text-success-800 dark:text-white font-semibold [text-shadow:0_1px_2px_rgba(0,0,0,0.08)] dark:[text-shadow:0_1px_3px_rgba(0,0,0,0.3)]',
+    warning:
+      'text-warning-800 dark:text-white font-semibold [text-shadow:0_1px_2px_rgba(0,0,0,0.08)] dark:[text-shadow:0_1px_3px_rgba(0,0,0,0.3)]',
+    danger:
+      'text-danger-800 dark:text-white font-semibold [text-shadow:0_1px_2px_rgba(0,0,0,0.08)] dark:[text-shadow:0_1px_3px_rgba(0,0,0,0.3)]',
+  }
+
+  const valueColorVariants = {
+    default: 'text-surface-900 dark:text-white',
+    primary:
+      'text-primary-900 dark:text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.06)] dark:[text-shadow:0_1px_3px_rgba(0,0,0,0.25)]',
+    success:
+      'text-success-900 dark:text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.06)] dark:[text-shadow:0_1px_3px_rgba(0,0,0,0.25)]',
+    warning:
+      'text-warning-900 dark:text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.06)] dark:[text-shadow:0_1px_3px_rgba(0,0,0,0.25)]',
+    danger:
+      'text-danger-900 dark:text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.06)] dark:[text-shadow:0_1px_3px_rgba(0,0,0,0.25)]',
+  }
+
+  const subtitleColorVariants = {
+    default: 'text-surface-400 dark:text-surface-500',
+    primary: 'text-primary-700 dark:text-primary-100',
+    success: 'text-success-700 dark:text-success-100',
+    warning: 'text-warning-700 dark:text-warning-100',
+    danger: 'text-danger-700 dark:text-danger-100',
+  }
+
   const numericValue = typeof value === 'number' ? value : parseFloat(value)
   const isNumeric = !isNaN(numericValue)
 
@@ -135,20 +167,22 @@ export function StatCard({
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <p className="text-sm font-medium text-surface-500 dark:text-surface-400">
+            <p className={cn('text-sm', titleColorVariants[variant])}>
               {title}
             </p>
             {badge}
           </div>
-          <p className="mt-2 text-3xl font-bold text-surface-900 dark:text-white">
-            {isNumeric ? (
-              <AnimatedNumber value={numericValue} />
-            ) : (
-              value
-            )}
-          </p>
+          {value !== '' && (
+            <p className={cn('mt-2 text-3xl font-bold', valueColorVariants[variant])}>
+              {isNumeric ? (
+                <AnimatedNumber value={numericValue} />
+              ) : (
+                value
+              )}
+            </p>
+          )}
           {subtitle && (
-            <p className="mt-1 text-xs text-surface-400 dark:text-surface-500">
+            <p className={cn('mt-1 text-xs', subtitleColorVariants[variant])}>
               {subtitle}
             </p>
           )}
@@ -185,7 +219,13 @@ export function StatCard({
         </motion.div>
       </div>
       {children && (
-        <div className="mt-3">
+        <div
+          className={cn(
+            'mt-3',
+            variant !== 'default' &&
+              'text-surface-800 dark:text-white [&_p]:text-surface-800 dark:[&_p]:text-white'
+          )}
+        >
           {children}
         </div>
       )}

@@ -163,7 +163,7 @@ export function DashboardPage() {
           variant="success"
           delay={0.3}
         >
-          <p className="text-xs text-surface-300 leading-relaxed">
+          <p className="text-xs leading-relaxed opacity-95">
             {highRisk > 0
               ? `${highRisk} high-risk students detected out of ${totalStudents}. Consider targeted outreach.`
               : 'All students are currently within normal risk ranges.'}

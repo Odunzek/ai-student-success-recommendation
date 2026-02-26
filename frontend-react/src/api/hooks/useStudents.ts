@@ -18,7 +18,10 @@ export function useStudents(filters: StudentFilters = {}) {
 export function useStudent(id: string | number) {
   return useQuery({
     queryKey: ['student', id],
-    queryFn: () => api.get<Student>(`/students/${id}`),
+    queryFn: async () => {
+      const res = await api.get<{ student: Student }>(`/students/${id}`)
+      return res.student
+    },
     enabled: !!id,
   })
 }
