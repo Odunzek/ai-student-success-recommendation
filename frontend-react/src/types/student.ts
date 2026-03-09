@@ -1,8 +1,9 @@
 export interface Student {
   id: number
   student_id: string
-  gender?: string
+  gender?: string | number
   age?: number
+  age_band?: number
   address?: string
   family_size?: string
   parental_status?: string

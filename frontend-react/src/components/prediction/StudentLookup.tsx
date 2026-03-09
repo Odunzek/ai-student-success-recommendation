@@ -23,9 +23,12 @@ export function StudentLookup() {
   const filteredStudents = useMemo(() => {
     if (!studentsData?.students || !searchQuery.trim()) return []
     const query = searchQuery.toLowerCase()
-    return studentsData.students.filter(
-      (s) => s.student_id.toLowerCase().includes(query)
-    ).slice(0, 8)
+    return studentsData.students
+      .filter((s) => {
+        const id = s.student_id ?? ''
+        return id.toString().toLowerCase().includes(query)
+      })
+      .slice(0, 8)
   }, [studentsData?.students, searchQuery])
 
   const selectedStudent = useMemo(() => {
@@ -84,7 +87,7 @@ export function StudentLookup() {
                 onFocus={() => searchQuery && setShowDropdown(true)}
                 onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
                 placeholder="Enter student ID..."
-                className="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-4 py-2.5 text-sm pr-10 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-white placeholder:text-surface-400 dark:placeholder:text-surface-500 px-4 py-2.5 text-sm pr-10 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-400 dark:text-surface-500" />
             </div>

@@ -12,22 +12,23 @@ export function ChatWidget() {
   const { isChatWidgetOpen, toggleChatWidget, setChatWidgetOpen, setActiveRoute } = useAppStore()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
-  const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const chat = useChat()
   const { data: status, isError: statusError } = useChatStatus()
   const isAvailable = !statusError && (status?.available ?? false)
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
-
-  useEffect(() => {
     if (isChatWidgetOpen) {
       setTimeout(() => inputRef.current?.focus(), 300)
     }
   }, [isChatWidgetOpen])
+
+  // Scroll to bottom when new messages arrive or AI is typing, so the latest answer is visible
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, chat.isPending])
 
   const handleSend = async () => {
     if (!input.trim() || chat.isPending || !isAvailable) return
@@ -165,7 +166,10 @@ export function ChatWidget() {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4" aria-live="polite">
+            <div
+              className="flex-1 overflow-y-auto p-4 space-y-4"
+              aria-live="polite"
+            >
               {messages.length === 0 ? (
                 <div className="text-center py-8">
                   <Bot className="h-10 w-10 mx-auto mb-3 text-surface-600" />
@@ -184,8 +188,7 @@ export function ChatWidget() {
                   <span className="text-sm">Thinking...</span>
                 </div>
               )}
-
-              <div ref={messagesEndRef} />
+              <div ref={messagesEndRef} aria-hidden="true" />
             </div>
 
             {/* Input */}

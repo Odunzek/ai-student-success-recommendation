@@ -124,7 +124,10 @@ export function ChatTab() {
     if (!studentsData?.students || !debouncedSearchQuery.trim()) return []
     const query = debouncedSearchQuery.toLowerCase()
     return studentsData.students
-      .filter((s) => s.student_id.toLowerCase().includes(query))
+      .filter((s) => {
+        const id = s.student_id ?? ''
+        return id.toString().toLowerCase().includes(query)
+      })
       .slice(0, 8)
   }, [studentsData?.students, debouncedSearchQuery])
 
@@ -314,7 +317,7 @@ export function ChatTab() {
                         setStudentSearchQuery(student.student_id)
                         setShowStudentDropdown(false)
                       }}
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-surface-50 dark:hover:bg-surface-800"
+                      className="w-full px-3 py-2 text-left text-sm text-surface-900 dark:text-white hover:bg-surface-50 dark:hover:bg-surface-800 focus:bg-surface-50 dark:focus:bg-surface-800 focus:outline-none"
                     >
                       {student.student_id}
                     </button>

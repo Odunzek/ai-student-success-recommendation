@@ -21,12 +21,13 @@ export function ChatInterface({
   isAvailable = true,
 }: ChatInterfaceProps) {
   const [input, setInput] = useState('')
-  const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
+  // Scroll to bottom when new messages arrive or AI is typing, so the latest answer is visible
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, isLoading])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -80,8 +81,7 @@ export function ChatInterface({
             <span className="text-sm">Thinking...</span>
           </div>
         )}
-
-        <div ref={messagesEndRef} />
+        <div ref={messagesEndRef} aria-hidden="true" />
       </div>
 
       {/* Input */}
