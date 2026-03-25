@@ -2,6 +2,7 @@
 venv/
 env/
 .venv/
+studRec/
 
 # Python
 __pycache__/
@@ -77,3 +78,5 @@ htmlcov/
 *.pem
 *.key
 secrets.json
+.env*
+!.env.example
