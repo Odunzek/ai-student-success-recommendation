@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../client'
+import { useAppStore } from '../../store/useAppStore'
 
 interface UploadResponse {
   message: string
@@ -91,6 +92,8 @@ export function useResetData() {
       queryClient.invalidateQueries({ queryKey: ['dashboard', 'risk-summary'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard', 'trend'] })
       queryClient.refetchQueries({ queryKey: ['upload', 'status'] })
+      // Clear persistent tab state so Intervention and Chat tabs reset too
+      useAppStore.getState().clearInterventionState()
     },
   })
 }

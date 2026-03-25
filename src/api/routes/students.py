@@ -62,7 +62,7 @@ async def list_students(
         if "student_id" not in student_data:
             student_data["student_id"] = f"STU{offset + i + 1:04d}"
         if "id" not in student_data:
-            student_data["id"] = offset + i + 1
+            student_data["id"] = offset + i
         formatted_students.append(student_data)
 
     return {
@@ -147,19 +147,33 @@ async def predict_student_risk(student_id: str):
     try:
         settings = get_settings()
 
+        def safe_int(val, default=0):
+            try:
+                v = float(val)
+                return default if v != v else int(v)  # NaN != NaN
+            except (TypeError, ValueError):
+                return default
+
+        def safe_float(val, default=0.0):
+            try:
+                v = float(val)
+                return default if v != v else v  # NaN != NaN
+            except (TypeError, ValueError):
+                return default
+
         # Extract features from student data
         feature_data = {
-            "num_of_prev_attempts": int(student.get("num_of_prev_attempts", 0)),
-            "studied_credits": int(student.get("studied_credits", 60)),
-            "avg_score": float(student.get("avg_score", 50)),
-            "total_clicks": int(student.get("total_clicks", 0)),
-            "completion_rate": float(student.get("completion_rate", 0.5)),
-            "module_BBB": int(student.get("module_BBB", 0)),
-            "module_CCC": int(student.get("module_CCC", 0)),
-            "module_DDD": int(student.get("module_DDD", 0)),
-            "module_EEE": int(student.get("module_EEE", 0)),
-            "module_FFF": int(student.get("module_FFF", 0)),
-            "module_GGG": int(student.get("module_GGG", 0)),
+            "num_of_prev_attempts": safe_int(student.get("num_of_prev_attempts"), 0),
+            "studied_credits": safe_int(student.get("studied_credits"), 60),
+            "avg_score": safe_float(student.get("avg_score"), 50.0),
+            "total_clicks": safe_int(student.get("total_clicks"), 0),
+            "completion_rate": safe_float(student.get("completion_rate"), 0.5),
+            "module_BBB": safe_int(student.get("module_BBB"), 0),
+            "module_CCC": safe_int(student.get("module_CCC"), 0),
+            "module_DDD": safe_int(student.get("module_DDD"), 0),
+            "module_EEE": safe_int(student.get("module_EEE"), 0),
+            "module_FFF": safe_int(student.get("module_FFF"), 0),
+            "module_GGG": safe_int(student.get("module_GGG"), 0),
         }
 
         result = predictor.predict(feature_data)

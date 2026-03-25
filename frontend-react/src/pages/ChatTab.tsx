@@ -21,6 +21,7 @@
  */
 
 import { useState, useEffect, useMemo } from 'react'
+import { useAppStore } from '../store/useAppStore'
 import { Sparkles, AlertTriangle, RefreshCw, UserCircle, Search, X } from 'lucide-react'
 import { ChatInterface } from '../components/chat/ChatInterface'
 import { Card, CardHeader, CardTitle } from '../components/ui/Card'
@@ -51,32 +52,19 @@ export function ChatTab() {
   // STATE
   // ---------------------------------------------------------------------------
 
-  /**
-   * Local message state - stores all messages for the current session.
-   * Note: Messages are stored locally (not fetched from server on reload)
-   * to keep the UI responsive. The server maintains the authoritative history.
-   */
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  // Persistent state (survives tab switches via Zustand)
+  const {
+    chatMessages: messages,
+    setChatMessages: setMessages,
+    chatSessionId: sessionId,
+    setChatSessionId: setSessionId,
+    chatSelectedStudentId: selectedStudentId,
+    setChatSelectedStudentId: setSelectedStudentId,
+    chatStudentSearchQuery: studentSearchQuery,
+    setChatStudentSearchQuery: setStudentSearchQuery,
+  } = useAppStore()
 
-  /**
-   * Session ID state with localStorage initialization.
-   * - On first render, attempts to restore session from localStorage
-   * - Updated when server returns a new session ID
-   * - Cleared on "New Conversation"
-   */
-  const [sessionId, setSessionId] = useState<string | null>(() => {
-    // Try to restore session from localStorage on initial render
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem(SESSION_STORAGE_KEY)
-    }
-    return null
-  })
-
-  /**
-   * Student context state for data-aware chat
-   */
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
-  const [studentSearchQuery, setStudentSearchQuery] = useState('')
+  // UI-only local state (no need to persist)
   const [showStudentDropdown, setShowStudentDropdown] = useState(false)
 
   // ---------------------------------------------------------------------------
@@ -179,7 +167,7 @@ export function ChatTab() {
     }
 
     // Add to UI immediately for responsiveness
-    setMessages((prev) => [...prev, userMessage])
+    setMessages([...messages, userMessage])
 
     try {
       // Send to server with session ID and optional student context
@@ -203,7 +191,8 @@ export function ChatTab() {
         flagged: response.flagged, // Mark if input was flagged as suspicious
       }
 
-      setMessages((prev) => [...prev, assistantMessage])
+      // Read current messages from store (not closure) to avoid stale state after async
+      setMessages([...useAppStore.getState().chatMessages, assistantMessage])
     } catch (error) {
       // On error, show a friendly error message in the chat
       const errorMessage: ChatMessage = {
@@ -212,7 +201,7 @@ export function ChatTab() {
         content: 'Sorry, I encountered an error. Please try again.',
         timestamp: new Date(),
       }
-      setMessages((prev) => [...prev, errorMessage])
+      setMessages([...useAppStore.getState().chatMessages, errorMessage])
     }
   }
 

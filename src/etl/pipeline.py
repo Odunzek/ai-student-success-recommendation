@@ -34,14 +34,14 @@ OULAD_FILES = [
 ]
 
 
-def detect_format(df: pd.DataFrame) -> Literal["processed", "combined_raw", "unknown"]:
+def detect_format(df: pd.DataFrame) -> Literal["processed", "combined_raw", "portuguese", "unknown"]:
     """Auto-detect if data is pre-processed or raw OULAD format.
 
     Args:
         df: Input DataFrame to analyze
 
     Returns:
-        Format type: "processed", "combined_raw", or "unknown"
+        Format type: "processed", "combined_raw", "portuguese", or "unknown"
     """
     columns = set(df.columns)
 
@@ -55,7 +55,75 @@ def detect_format(df: pd.DataFrame) -> Literal["processed", "combined_raw", "unk
     if raw_indicators.issubset(columns) or "id_student" in columns:
         return "combined_raw"
 
+    # Check for Portuguese/UCI Student Performance dataset format
+    portuguese_indicators = {"g1", "g2", "g3", "failures", "absences", "study_time"}
+    if portuguese_indicators.issubset(columns):
+        return "portuguese"
+
     return "unknown"
+
+
+def transform_portuguese(df: pd.DataFrame) -> pd.DataFrame:
+    """Transform UCI Portuguese student performance dataset into model features.
+
+    Maps columns from the UCI Student Performance dataset to OULAD model features:
+    - avg_score: mean of g1, g2, g3 (converted from 0-20 → 0-100 scale)
+    - completion_rate: derived from absences (fewer absences = higher rate)
+    - num_of_prev_attempts: mapped from failures
+    - total_clicks: estimated from study_time (1-4 scale → engagement proxy)
+    - studied_credits: fixed default of 60 (no equivalent column)
+    - module_*: all 0 (no module info in this dataset)
+
+    Args:
+        df: Raw Portuguese student DataFrame
+
+    Returns:
+        Transformed DataFrame with required OULAD features
+    """
+    result = pd.DataFrame()
+
+    # Student ID
+    if "student_id" in df.columns:
+        result["student_id"] = df["student_id"]
+    else:
+        result["student_id"] = df.index.astype(str)
+
+    # avg_score: mean of g1, g2, g3 on 0-20 scale → convert to 0-100
+    grade_cols = [c for c in ["g1", "g2", "g3"] if c in df.columns]
+    if grade_cols:
+        result["avg_score"] = df[grade_cols].mean(axis=1) * 5  # 0-20 → 0-100
+    else:
+        result["avg_score"] = 50.0
+    result["avg_score"] = result["avg_score"].fillna(50.0).clip(0, 100)
+
+    # completion_rate: inverse of absences (0 absences = 1.0, 30+ = 0.0)
+    if "absences" in df.columns:
+        result["completion_rate"] = (1 - (df["absences"].clip(0, 30) / 30)).round(3)
+    else:
+        result["completion_rate"] = 0.8
+    result["completion_rate"] = result["completion_rate"].fillna(0.8).clip(0, 1)
+
+    # num_of_prev_attempts: mapped from failures
+    if "failures" in df.columns:
+        result["num_of_prev_attempts"] = df["failures"].fillna(0).astype(int)
+    else:
+        result["num_of_prev_attempts"] = 0
+
+    # total_clicks: study_time is 1-4 scale; multiply to create reasonable engagement proxy
+    # study_time 1 (~2h/week) → ~400 clicks, 4 (>10h/week) → ~2000 clicks
+    if "study_time" in df.columns:
+        result["total_clicks"] = (df["study_time"].fillna(2) * 500).astype(int)
+    else:
+        result["total_clicks"] = 1000
+
+    # studied_credits: no equivalent — use standard default
+    result["studied_credits"] = 60
+
+    # Module indicators: not applicable to this dataset
+    for module in ["BBB", "CCC", "DDD", "EEE", "FFF", "GGG"]:
+        result[f"module_{module}"] = 0
+
+    return result
 
 
 def validate_features(df: pd.DataFrame) -> tuple[bool, list[str]]:
@@ -398,15 +466,30 @@ def process_uploaded_file(
     detected = detect_format(df)
 
     if detected == "processed":
-        # Already has required features
+        # Already has required features — still fill any NaN rows
         if "student_id" not in df.columns:
             df["student_id"] = df.index.astype(str)
+        nan_fills = {
+            "avg_score": 50.0,
+            "completion_rate": 0.5,
+            "total_clicks": 0,
+            "num_of_prev_attempts": 0,
+            "studied_credits": 60,
+        }
+        for col, fill_val in nan_fills.items():
+            if col in df.columns:
+                df[col] = df[col].fillna(fill_val)
         return df, "processed"
 
     elif detected == "combined_raw":
         # Transform combined raw data
         df = transform_combined(df)
         return df, "combined_raw"
+
+    elif detected == "portuguese":
+        # Transform UCI Portuguese student performance dataset
+        df = transform_portuguese(df)
+        return df, "portuguese"
 
     else:
         # Unknown format - try to use as-is with defaults
@@ -428,6 +511,18 @@ def process_uploaded_file(
                     df[feat] = 50.0
                 else:
                     df[feat] = 0
+
+        # Fill NaN in feature columns that already exist (don't just add missing ones)
+        nan_fills = {
+            "avg_score": 50.0,
+            "completion_rate": 0.5,
+            "total_clicks": 0,
+            "num_of_prev_attempts": 0,
+            "studied_credits": 60,
+        }
+        for col, fill_val in nan_fills.items():
+            if col in df.columns:
+                df[col] = df[col].fillna(fill_val)
 
         # Return format string with info about defaults
         if defaulted_columns:

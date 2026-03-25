@@ -151,19 +151,39 @@ class RiskPredictor:
         numeric_features = self.settings.numeric_features
         module_features = self.settings.module_features
 
-        # Extract numeric features with defaults (no scaling needed for XGBoost)
-        # Missing values default to 0.0 to ensure prediction can proceed
+        # Safe defaults when a value is missing or NaN
+        feature_defaults = {
+            "num_of_prev_attempts": 0.0,
+            "studied_credits": 60.0,
+            "avg_score": 50.0,
+            "total_clicks": 0.0,
+            "completion_rate": 0.5,
+        }
+
         numeric_values = []
         for feat in numeric_features:
-            value = student_data.get(feat, 0.0)
-            numeric_values.append(float(value) if value is not None else 0.0)
+            value = student_data.get(feat)
+            default = feature_defaults.get(feat, 0.0)
+            # Replace None or NaN with the safe default
+            if value is None:
+                value = default
+            else:
+                try:
+                    value = float(value)
+                    if value != value:  # NaN check (NaN != NaN is always True)
+                        value = default
+                except (TypeError, ValueError):
+                    value = default
+            numeric_values.append(value)
 
         # Extract module indicators (binary 0/1)
-        # These are one-hot encoded module identifiers from training
         module_values = []
         for feat in module_features:
             value = student_data.get(feat, 0)
-            module_values.append(1 if value else 0)
+            try:
+                module_values.append(1 if float(value or 0) else 0)
+            except (TypeError, ValueError):
+                module_values.append(0)
 
         # Combine: numeric + binary module indicators (11 features total)
         all_values = numeric_values + module_values

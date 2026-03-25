@@ -22,8 +22,7 @@ class Settings(BaseSettings):
     feature_list_path: Path = project_root / "models" / "feature_list.csv"
     student_data_path: Path = project_root / "data" / "processed" / "student_features.csv"
 
-    # LLM Provider: "openai" or "ollama"
-    llm_provider: str = "openai"
+    # LLM settings
     llm_timeout: float = 30.0
     llm_enabled: bool = True
 
@@ -31,10 +30,6 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     openai_model: str = "gpt-4o-mini"
     openai_base_url: str | None = None  # Optional for Azure/proxies
-
-    # Ollama settings (fallback)
-    ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "deepseek-r1:1.5b"
 
     # Feature configuration
     numeric_features: list[str] = [

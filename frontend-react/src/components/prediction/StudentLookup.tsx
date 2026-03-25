@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Search } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { Card, CardHeader, CardTitle } from '../ui/Card'
@@ -19,6 +19,13 @@ export function StudentLookup() {
   const { data: prediction, isLoading: isPredicting, error: predictionError } = useStudentPredict(
     selectedStudentId ?? ''
   )
+
+  useEffect(() => {
+    if (studentsData && studentsData.students.length === 0) {
+      setSearchQuery('')
+      setSelectedStudentId(null)
+    }
+  }, [studentsData])
 
   const filteredStudents = useMemo(() => {
     if (!studentsData?.students || !searchQuery.trim()) return []

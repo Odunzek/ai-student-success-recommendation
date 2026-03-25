@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { InterventionResult } from '../types/intervention'
+import type { ChatMessage } from '../types/chat'
 
 export type NavRoute = 'dashboard' | 'risk-assessment' | 'students' | 'interventions' | 'chat' | 'data'
 
@@ -33,6 +34,17 @@ interface AppState {
   setInterventionSearchQuery: (query: string) => void
   setInterventionResult: (result: InterventionResult | null) => void
   clearInterventionState: () => void
+
+  // Chat tab state persistence
+  chatMessages: ChatMessage[]
+  chatSessionId: string | null
+  chatSelectedStudentId: string | null
+  chatStudentSearchQuery: string
+  setChatMessages: (messages: ChatMessage[]) => void
+  setChatSessionId: (id: string | null) => void
+  setChatSelectedStudentId: (id: string | null) => void
+  setChatStudentSearchQuery: (query: string) => void
+  clearChatState: () => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -56,7 +68,7 @@ export const useAppStore = create<AppState>((set) => ({
     selectedStudentId: null
   }),
 
-  useLlm: false,
+  useLlm: true,
   setUseLlm: (value) => set({ useLlm: value }),
 
   isChatWidgetOpen: false,
@@ -74,5 +86,21 @@ export const useAppStore = create<AppState>((set) => ({
     interventionStudentId: null,
     interventionSearchQuery: '',
     interventionResult: null,
+  }),
+
+  // Chat tab state persistence
+  chatMessages: [],
+  chatSessionId: typeof window !== 'undefined' ? localStorage.getItem('chat_session_id') : null,
+  chatSelectedStudentId: null,
+  chatStudentSearchQuery: '',
+  setChatMessages: (messages) => set({ chatMessages: messages }),
+  setChatSessionId: (id) => set({ chatSessionId: id }),
+  setChatSelectedStudentId: (id) => set({ chatSelectedStudentId: id }),
+  setChatStudentSearchQuery: (query) => set({ chatStudentSearchQuery: query }),
+  clearChatState: () => set({
+    chatMessages: [],
+    chatSessionId: null,
+    chatSelectedStudentId: null,
+    chatStudentSearchQuery: '',
   }),
 }))
