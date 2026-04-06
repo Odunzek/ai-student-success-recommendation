@@ -15,8 +15,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+#lib/
+#lib64/
 parts/
 sdist/
 var/
@@ -55,12 +55,12 @@ frontend/dist/
 
 # Data and models (large files)
 *.csv
-*.pkl
+#*.pkl
 *.h5
 *.model
 *.joblib
 data/*.csv
-models/*.pkl
+#models/*.pkl
 models/*.h5
 
 # Logs
