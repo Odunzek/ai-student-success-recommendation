@@ -141,6 +141,17 @@ export function ChatTab() {
     }
   }, [sessionId])
 
+  /**
+   * Ensure the chat tab starts at the top when opened.
+   * This prevents the page from staying scrolled to the middle/bottom
+   * when navigating from other tabs.
+   */
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'auto' })
+    }
+  }, [])
+
   // ---------------------------------------------------------------------------
   // EVENT HANDLERS
   // ---------------------------------------------------------------------------

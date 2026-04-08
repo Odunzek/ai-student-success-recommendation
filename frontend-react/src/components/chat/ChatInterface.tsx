@@ -22,11 +22,18 @@ export function ChatInterface({
 }: ChatInterfaceProps) {
   const [input, setInput] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // Scroll to bottom when new messages arrive or AI is typing, so the latest answer is visible
+  // Scroll to bottom of the chat container (not the whole page)
+  // when new messages arrive or AI is typing.
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const container = messagesContainerRef.current
+    if (!container) return
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: 'smooth',
+    })
   }, [messages, isLoading])
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -63,7 +70,10 @@ export function ChatInterface({
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto p-4 space-y-4"
+      >
         {messages.length === 0 ? (
           <div className="text-center py-12 text-surface-500 dark:text-surface-400">
             <p className="mb-2">No messages yet</p>

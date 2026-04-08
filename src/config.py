@@ -17,7 +17,8 @@ class Settings(BaseSettings):
 
     # Model paths (relative to project root)
     project_root: Path = Path(__file__).parent.parent
-    model_path: Path = project_root / "models" / "xgboost_final.joblib"
+    # Use tuned CatBoost model by default for risk prediction
+    model_path: Path = project_root / "models" / "catboost_tuned.pkl"
     scaler_path: Path = project_root / "models" / "scaler.joblib"
     feature_list_path: Path = project_root / "models" / "feature_list.csv"
     student_data_path: Path = project_root / "data" / "processed" / "student_features.csv"
