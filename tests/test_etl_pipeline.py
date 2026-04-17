@@ -201,10 +201,12 @@ class TestTransformPortugueseOther:
         result = transform_portuguese(self._standard_df())
         assert result["studied_credits"].iloc[0] == 60
 
-    def test_all_module_flags_are_zero(self):
+    def test_categorical_features_default_to_unknown(self):
+        """Portuguese dataset has no OULAD demographics — all categoricals → 'Unknown'."""
         result = transform_portuguese(self._standard_df())
-        for module in ["module_BBB", "module_CCC", "module_DDD", "module_EEE", "module_FFF", "module_GGG"]:
-            assert result[module].iloc[0] == 0, f"{module} should be 0"
+        for col in ["code_module", "gender", "region", "highest_education",
+                    "imd_band", "age_band", "disability"]:
+            assert result[col].iloc[0] == "Unknown", f"{col} should be 'Unknown'"
 
     def test_output_has_all_required_features(self):
         result = transform_portuguese(self._standard_df())

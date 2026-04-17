@@ -158,13 +158,15 @@ class StudentDataLoader:
 
         df = self._data.copy()
 
-        # Apply search filter if provided
+        # Apply search filter if provided — matches student_id or name
         if search:
             search_lower = search.lower()
-            # Search in student_id column
-            if "student_id" in df.columns:
-                mask = df["student_id"].astype(str).str.lower().str.contains(search_lower, na=False)
-                df = df[mask]
+            mask = df["student_id"].astype(str).str.lower().str.contains(search_lower, na=False) \
+                if "student_id" in df.columns else df.index.isin([])
+            if "name" in df.columns:
+                name_mask = df["name"].astype(str).str.lower().str.contains(search_lower, na=False)
+                mask = mask | name_mask
+            df = df[mask]
 
         # Apply risk level filter if provided
         if risk_level and risk_level in ("low", "medium", "high"):
@@ -174,18 +176,11 @@ class StudentDataLoader:
             predictor = get_predictor()
 
             if predictor.is_loaded:
-                # Filter by predicted risk level
+                # Filter by predicted risk level — pass full 12-feature dict
                 risk_mask = []
-                for idx, row in df.iterrows():
+                for _, row in df.iterrows():
                     try:
-                        features = {
-                            "num_of_prev_attempts": int(row.get("num_of_prev_attempts", 0)),
-                            "studied_credits": int(row.get("studied_credits", 60)),
-                            "avg_score": float(row.get("avg_score", 50)),
-                            "total_clicks": int(row.get("total_clicks", 0)),
-                            "completion_rate": float(row.get("completion_rate", 0.5)),
-                        }
-                        result = predictor.predict(features)
+                        result = predictor.predict(row.to_dict())
                         risk_mask.append(result.get("risk_level", "low") == risk_level)
                     except Exception:
                         risk_mask.append(False)

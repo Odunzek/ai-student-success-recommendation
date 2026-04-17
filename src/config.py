@@ -17,10 +17,9 @@ class Settings(BaseSettings):
 
     # Model paths (relative to project root)
     project_root: Path = Path(__file__).parent.parent
-    # Use tuned CatBoost model by default for risk prediction
-    model_path: Path = project_root / "models" / "catboost_tuned.pkl"
-    scaler_path: Path = project_root / "models" / "scaler.joblib"
-    feature_list_path: Path = project_root / "models" / "feature_list.csv"
+    # CatBoost baseline model — 12 features (5 numeric + 7 native categorical)
+    # Baseline chosen over tuned: higher Recall (0.9009 vs 0.8983) on held-out test set
+    model_path: Path = project_root / "models" / "catboost_baseline_production.pkl"
     student_data_path: Path = project_root / "data" / "processed" / "student_features.csv"
 
     # LLM settings
@@ -32,7 +31,7 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o-mini"
     openai_base_url: str | None = None  # Optional for Azure/proxies
 
-    # Feature configuration
+    # Feature configuration — matches catboost_baseline_production.pkl training order
     numeric_features: list[str] = [
         "num_of_prev_attempts",
         "studied_credits",
@@ -40,13 +39,14 @@ class Settings(BaseSettings):
         "total_clicks",
         "completion_rate",
     ]
-    module_features: list[str] = [
-        "module_BBB",
-        "module_CCC",
-        "module_DDD",
-        "module_EEE",
-        "module_FFF",
-        "module_GGG",
+    categorical_features: list[str] = [
+        "code_module",
+        "gender",
+        "region",
+        "highest_education",
+        "imd_band",
+        "age_band",
+        "disability",
     ]
 
     # Risk classification thresholds (configurable via env)

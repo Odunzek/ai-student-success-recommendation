@@ -42,6 +42,7 @@ class RuleEngine:
         total_clicks: int,
         studied_credits: int = 60,
         num_of_prev_attempts: int = 0,
+        shap_factors: list[dict] | None = None,
     ) -> dict:
         """Generate rule-based interventions based on student metrics.
 
@@ -147,6 +148,30 @@ class RuleEngine:
                 ]
             })
 
+        # -----------------------------------------------------------------------
+        # ENGAGEMENT vs PERFORMANCE MISMATCH
+        # High VLE clicks + low scores means the student is putting in effort
+        # but not translating it into results. The fix is study METHOD, not
+        # more time — so we flag a learning strategy review rather than
+        # just "engage more". Threshold: 300 clicks is above the very-low
+        # engagement boundary (100) but below active engagement (~500+).
+        # -----------------------------------------------------------------------
+        if total_clicks >= 300 and avg_score < self.thresholds.low_score:
+            issues.append("high engagement but low academic scores")
+            interventions.append({
+                "type": "academic",
+                "priority": "high",
+                "title": "Learning Strategy Review",
+                "description": f"Student shows strong engagement ({total_clicks} VLE clicks) but average score of {avg_score:.0f}% suggests effort is not translating into results. Study approach may need to change, not just effort level.",
+                "actions": [
+                    "Meet to review current study methods and habits",
+                    "Identify whether difficulty is comprehension, exam technique, or time pressure",
+                    "Refer to learning skills advisor or subject tutor",
+                    "Review assessment feedback together to find recurring gaps",
+                    "Set targeted score improvement goal for next assessment",
+                ]
+            })
+
         # Check for repeat attempts
         if num_of_prev_attempts > 0:
             issues.append(f"{num_of_prev_attempts} previous attempt(s)")
@@ -220,18 +245,73 @@ class RuleEngine:
                 ]
             })
 
+        # -----------------------------------------------------------------------
+        # SHAP-DRIVEN PRIORITY ESCALATION
+        # The rule engine fires on raw thresholds, but SHAP tells us which
+        # features are *actually* pushing THIS student's risk score up.
+        # If the model says completion_rate is the #1 driver, the academic
+        # intervention for completion should be critical, not just high.
+        # We escalate: medium→high, high→critical for the top 2 SHAP features.
+        # This ensures the most model-relevant action surfaces first in the UI.
+        # -----------------------------------------------------------------------
+        if shap_factors:
+            # Get the top risk-increasing feature from the model
+            top_risk_features = [
+                f["feature"] for f in shap_factors
+                if f.get("direction") in ("positive", "increases_risk") and f.get("impact", 0) > 0
+            ]
+            feature_to_type = {
+                "completion_rate": "academic",
+                "avg_score": "academic",
+                "total_clicks": "engagement",
+                "num_of_prev_attempts": "support",
+                "studied_credits": "support",
+            }
+            for intervention in interventions:
+                for top_feat in top_risk_features[:2]:
+                    if intervention["type"] == feature_to_type.get(top_feat, ""):
+                        if intervention["priority"] == "medium":
+                            intervention["priority"] = "high"
+                        elif intervention["priority"] == "high":
+                            intervention["priority"] = "critical"
+                        break
+
+        # -----------------------------------------------------------------------
+        # MULTI-FACTOR COORDINATION
+        # When 3+ independent risk issues converge, sending separate emails to
+        # separate services is less effective than one coordinated plan with a
+        # single named contact. Research supports "key worker" models for
+        # students with complex needs. Threshold ≥3 issues chosen empirically.
+        # -----------------------------------------------------------------------
+        if len(issues) >= 3:
+            interventions.append({
+                "type": "support",
+                "priority": "critical" if risk_level == "high" else "high",
+                "title": "Coordinated Support Plan",
+                "description": f"Student has {len(issues)} converging risk factors. Individual fixes are less effective than a coordinated support plan with a named point of contact.",
+                "actions": [
+                    "Assign a single named academic advisor as primary contact",
+                    "Hold a joint meeting (student + advisor + relevant tutor) within 48 hours",
+                    "Create a written support agreement with agreed milestones",
+                    "Schedule fortnightly review meetings until risk score reduces",
+                    "Flag to welfare team if personal or financial barriers are suspected",
+                ]
+            })
+
         # Generate summary
         if not issues:
             if risk_level == "low":
-                summary = "Student is performing well with no significant concerns identified."
+                summary = "Student is performing well with no significant concerns identified. Focus on maintaining momentum and stretch opportunities."
                 interventions.append({
                     "type": "support",
                     "priority": "low",
-                    "title": "Positive Progress",
-                    "description": "Continue current approach and monitor for any changes.",
+                    "title": "Maintain Momentum",
+                    "description": f"Student shows low dropout risk with a {risk_score}% risk score. No immediate action required, but proactive positive contact reinforces continued engagement.",
                     "actions": [
-                        "Send encouragement message",
-                        "Share advanced resources if interested",
+                        "Send a brief personalised encouragement message acknowledging their progress",
+                        "Share any advanced or optional resources relevant to their module",
+                        "Invite them to peer mentoring or study group leadership if eligible",
+                        "Schedule a light-touch check-in at the mid-module point",
                     ]
                 })
             else:

@@ -10,19 +10,21 @@ import pandas as pd
 from src.config import get_settings
 
 
-# Required features for the ML model
+# Required features for the ML model — matches catboost_baseline_production.pkl
+# 5 numeric + 7 raw string categoricals (no encoding needed)
 REQUIRED_FEATURES = [
     "num_of_prev_attempts",
     "studied_credits",
     "avg_score",
     "total_clicks",
     "completion_rate",
-    "module_BBB",
-    "module_CCC",
-    "module_DDD",
-    "module_EEE",
-    "module_FFF",
-    "module_GGG",
+    "code_module",
+    "gender",
+    "region",
+    "highest_education",
+    "imd_band",
+    "age_band",
+    "disability",
 ]
 
 # OULAD file names expected in ZIP
@@ -119,15 +121,21 @@ def transform_portuguese(df: pd.DataFrame) -> pd.DataFrame:
     # studied_credits: no equivalent — use standard default
     result["studied_credits"] = 60
 
-    # Module indicators: not applicable to this dataset
-    for module in ["BBB", "CCC", "DDD", "EEE", "FFF", "GGG"]:
-        result[f"module_{module}"] = 0
+    # Categorical features: not available in the Portuguese dataset
+    # 'Unknown' is a valid CatBoost category — treated as its own group
+    result["code_module"]        = "Unknown"
+    result["gender"]             = "Unknown"
+    result["region"]             = "Unknown"
+    result["highest_education"]  = "Unknown"
+    result["imd_band"]           = "Unknown"
+    result["age_band"]           = "Unknown"
+    result["disability"]         = "Unknown"
 
     return result
 
 
 def validate_features(df: pd.DataFrame) -> tuple[bool, list[str]]:
-    """Ensure output DataFrame has all required 11 features.
+    """Ensure output DataFrame has all required 12 features.
 
     Args:
         df: DataFrame to validate
@@ -255,19 +263,21 @@ def transform_oulad(dfs: dict[str, pd.DataFrame]) -> pd.DataFrame:
 
     result["completion_rate"] = result["completion_rate"].fillna(0.5)
 
-    # One-hot encode code_module
-    if "code_module" in student_info.columns:
-        module_info = student_info[["id_student", "code_module"]].copy()
-        result = result.merge(module_info, on="id_student", how="left")
+    # Categorical features — kept as raw strings for CatBoost native handling
+    # Pull each column from studentInfo if present, otherwise default to 'Unknown'
+    cat_cols = ["code_module", "gender", "region", "highest_education",
+                "imd_band", "age_band", "disability"]
 
-        for module in ["BBB", "CCC", "DDD", "EEE", "FFF", "GGG"]:
-            result[f"module_{module}"] = (result["code_module"] == module).astype(int)
+    available_cats = [c for c in cat_cols if c in student_info.columns]
+    if available_cats:
+        cat_info = student_info[["id_student"] + available_cats].copy()
+        result = result.merge(cat_info, on="id_student", how="left")
 
-        result = result.drop(columns=["code_module"], errors="ignore")
-    else:
-        # Default all modules to 0
-        for module in ["BBB", "CCC", "DDD", "EEE", "FFF", "GGG"]:
-            result[f"module_{module}"] = 0
+    for col in cat_cols:
+        if col not in result.columns:
+            result[col] = "Unknown"
+        else:
+            result[col] = result[col].fillna("Unknown").astype(str)
 
     # Drop id_student for model input (or rename to student_id)
     result = result.rename(columns={"id_student": "student_id"})
@@ -365,23 +375,22 @@ def transform_combined(df: pd.DataFrame) -> pd.DataFrame:
         else:
             result["completion_rate"] = 0.5
 
-        # One-hot encode code_module
-        if "code_module" in df.columns:
-            module_per_student = grouped["code_module"].first().reset_index()
-            module_per_student.columns = ["id_student", "code_module"]
-            result = result.merge(
-                module_per_student.rename(columns={"id_student": "student_id"}),
-                on="student_id",
-                how="left"
-            )
+        # Categorical features — kept as raw strings for CatBoost native handling
+        cat_cols = ["code_module", "gender", "region", "highest_education",
+                    "imd_band", "age_band", "disability"]
 
-            for module in ["BBB", "CCC", "DDD", "EEE", "FFF", "GGG"]:
-                result[f"module_{module}"] = (result["code_module"] == module).astype(int)
-
-            result = result.drop(columns=["code_module"], errors="ignore")
-        else:
-            for module in ["BBB", "CCC", "DDD", "EEE", "FFF", "GGG"]:
-                result[f"module_{module}"] = 0
+        for col in cat_cols:
+            if col in df.columns:
+                cat_per_student = grouped[col].first().reset_index()
+                cat_per_student.columns = ["id_student", col]
+                result = result.merge(
+                    cat_per_student.rename(columns={"id_student": "student_id"}),
+                    on="student_id",
+                    how="left"
+                )
+                result[col] = result[col].fillna("Unknown").astype(str)
+            else:
+                result[col] = "Unknown"
     else:
         # No id_student column - use row index
         result["num_of_prev_attempts"] = df.get("num_of_prev_attempts", 0)
@@ -390,11 +399,10 @@ def transform_combined(df: pd.DataFrame) -> pd.DataFrame:
         result["total_clicks"] = df.get("total_clicks", df.get("sum_click", 0))
         result["completion_rate"] = df.get("completion_rate", 0.5)
 
-        for module in ["BBB", "CCC", "DDD", "EEE", "FFF", "GGG"]:
-            if f"module_{module}" in df.columns:
-                result[f"module_{module}"] = df[f"module_{module}"]
-            else:
-                result[f"module_{module}"] = 0
+        cat_cols = ["code_module", "gender", "region", "highest_education",
+                    "imd_band", "age_band", "disability"]
+        for col in cat_cols:
+            result[col] = str(df.get(col, "Unknown") or "Unknown")
 
     # Fill NaN values
     result["num_of_prev_attempts"] = result["num_of_prev_attempts"].fillna(0).astype(int)

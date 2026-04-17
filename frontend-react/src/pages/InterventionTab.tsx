@@ -58,7 +58,9 @@ export function InterventionTab() {
     if (!studentsData?.students || !debouncedSearchQuery.trim()) return []
     const query = debouncedSearchQuery.toLowerCase()
     return studentsData.students.filter(
-      (s) => s.student_id.toLowerCase().includes(query)
+      (s) =>
+        s.student_id.toLowerCase().includes(query) ||
+        (s.name ?? '').toLowerCase().includes(query)
     ).slice(0, 8)
   }, [studentsData?.students, debouncedSearchQuery])
 
@@ -68,9 +70,9 @@ export function InterventionTab() {
     return studentsData.students.find((s) => String(s.id) === interventionStudentId)
   }, [interventionStudentId, studentsData?.students])
 
-  const handleSelectStudent = (studentId: number, studentIdStr: string) => {
+  const handleSelectStudent = (studentId: number, studentIdStr: string, name?: string) => {
     setInterventionStudentId(String(studentId))
-    setInterventionSearchQuery(studentIdStr)
+    setInterventionSearchQuery(name ?? studentIdStr)
     setShowDropdown(false)
     // Clear previous result when selecting new student
     setInterventionResult(null)
@@ -95,8 +97,10 @@ export function InterventionTab() {
       total_clicks: selectedStudent.total_clicks ?? 0,
       studied_credits: selectedStudent.studied_credits ?? 60,
       num_of_prev_attempts: selectedStudent.num_of_prev_attempts ?? 0,
-      student_name: selectedStudent.student_id,
+      student_name: selectedStudent.name ?? selectedStudent.student_id,
       use_llm: useLlm,
+      // Pass SHAP factors so the LLM knows which features are actually driving this student's risk
+      shap_factors: prediction.shap_factors?.length ? prediction.shap_factors : undefined,
     }
 
     const result = await intervention.mutateAsync(interventionInput)
@@ -153,7 +157,7 @@ export function InterventionTab() {
                   onChange={handleInputChange}
                   onFocus={() => interventionSearchQuery && setShowDropdown(true)}
                   onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-                  placeholder="Search by student ID..."
+                  placeholder="Search by name or student ID..."
                   className="w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 px-4 py-2.5 text-sm pr-10 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 />
                 <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-400 dark:text-surface-500" />
@@ -166,10 +170,13 @@ export function InterventionTab() {
                     <button
                       key={student.id}
                       type="button"
-                      onClick={() => handleSelectStudent(student.id, student.student_id)}
+                      onClick={() => handleSelectStudent(student.id, student.student_id, student.name)}
                       className="w-full px-4 py-2 text-left text-sm hover:bg-surface-50 dark:hover:bg-surface-800 focus:bg-surface-50 dark:focus:bg-surface-800 focus:outline-none"
                     >
-                      <span className="font-medium">{student.student_id}</span>
+                      <span className="font-medium">{student.name ?? student.student_id}</span>
+                      {student.name && (
+                        <span className="ml-2 text-surface-400 dark:text-surface-500 text-xs">{student.student_id}</span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -196,8 +203,13 @@ export function InterventionTab() {
                 {/* Student Info */}
                 <div className="text-center border-b border-surface-100 dark:border-surface-800 pb-4">
                   <p className="text-lg font-semibold text-surface-900 dark:text-white">
-                    {selectedStudent.student_id}
+                    {selectedStudent.name ?? selectedStudent.student_id}
                   </p>
+                  {selectedStudent.name && (
+                    <p className="text-xs text-surface-400 dark:text-surface-500 mt-0.5">
+                      {selectedStudent.student_id}
+                    </p>
+                  )}
                   <p className="text-sm text-surface-500 dark:text-surface-400 mt-1">
                     Risk Level: <span className={`font-medium ${
                       (interventionResult?.risk_level || prediction.risk_level) === 'high' ? 'text-red-500' :

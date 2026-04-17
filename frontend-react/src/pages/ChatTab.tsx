@@ -113,8 +113,9 @@ export function ChatTab() {
     const query = debouncedSearchQuery.toLowerCase()
     return studentsData.students
       .filter((s) => {
-        const id = s.student_id ?? ''
-        return id.toString().toLowerCase().includes(query)
+        const id = (s.student_id ?? '').toLowerCase()
+        const name = (s.name ?? '').toLowerCase()
+        return id.includes(query) || name.includes(query)
       })
       .slice(0, 8)
   }, [studentsData?.students, debouncedSearchQuery])
@@ -299,7 +300,7 @@ export function ChatTab() {
                   }}
                   onFocus={() => studentSearchQuery && setShowStudentDropdown(true)}
                   onBlur={() => setTimeout(() => setShowStudentDropdown(false), 200)}
-                  placeholder="Search by student ID..."
+                  placeholder="Search by name or student ID..."
                   className="w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-white placeholder:text-surface-400 dark:placeholder:text-surface-500 px-3 py-2 text-sm pr-8 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 />
                 <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-400" />
@@ -314,12 +315,15 @@ export function ChatTab() {
                       type="button"
                       onClick={() => {
                         setSelectedStudentId(student.student_id)
-                        setStudentSearchQuery(student.student_id)
+                        setStudentSearchQuery(student.name ?? student.student_id)
                         setShowStudentDropdown(false)
                       }}
                       className="w-full px-3 py-2 text-left text-sm text-surface-900 dark:text-white hover:bg-surface-50 dark:hover:bg-surface-800 focus:bg-surface-50 dark:focus:bg-surface-800 focus:outline-none"
                     >
-                      {student.student_id}
+                      <span className="font-medium">{student.name ?? student.student_id}</span>
+                      {student.name && (
+                        <span className="ml-2 text-surface-400 dark:text-surface-500 text-xs">{student.student_id}</span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -331,7 +335,14 @@ export function ChatTab() {
               <div className="flex items-center justify-between p-2 bg-primary/10 rounded-lg">
                 <div className="flex items-center gap-2">
                   <UserCircle className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium text-primary">{selectedStudent.student_id}</span>
+                  <div>
+                    <span className="text-sm font-medium text-primary">
+                      {selectedStudent.name ?? selectedStudent.student_id}
+                    </span>
+                    {selectedStudent.name && (
+                      <span className="block text-xs text-primary/70">{selectedStudent.student_id}</span>
+                    )}
+                  </div>
                 </div>
                 <button
                   onClick={() => {

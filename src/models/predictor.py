@@ -2,13 +2,14 @@
 Risk prediction model loader and predictor.
 
 This module provides the core ML prediction functionality for student dropout
-risk assessment. It loads a pre-trained XGBoost model and provides methods
+risk assessment. It loads the production CatBoost model and provides methods
 for making predictions on individual students.
 
 Model Details:
-    - Algorithm: XGBoost (Gradient Boosting)
-    - Training accuracy: ~91% (configurable via settings)
-    - Features: 11 total (5 numeric + 6 binary module indicators)
+    - Algorithm: CatBoost (Gradient Boosting) with native categorical handling
+    - File: catboost_baseline_production.pkl
+    - Recall: 0.9009 on held-out test set (primary reason baseline was chosen over tuned)
+    - Features: 12 total (5 numeric + 7 raw string categoricals)
     - Output: Probability of dropout risk (0-1), converted to 0-100 score
 
 Features Used:
@@ -19,8 +20,14 @@ Features Used:
         - total_clicks: Total LMS activity/engagement clicks
         - completion_rate: Course completion percentage (0-1)
 
-    Binary/Categorical (6):
-        - module_BBB through module_GGG: One-hot encoded module indicators
+    Categorical (7) — passed as raw strings, no encoding needed:
+        - code_module: Module code (e.g. 'AAA', 'BBB', ...)
+        - gender: 'M' or 'F'
+        - region: e.g. 'Scotland', 'London Region', ...
+        - highest_education: e.g. 'HE Qualification', 'A Level or Equivalent', ...
+        - imd_band: Deprivation decile e.g. '0-10%', '10-20%', ...
+        - age_band: '0-35', '35-55', or '55<='
+        - disability: 'Y' or 'N'
 
 Usage:
     from src.models.predictor import get_predictor
@@ -32,6 +39,8 @@ Usage:
         "avg_score": 65,
         "completion_rate": 0.7,
         "total_clicks": 500,
+        "code_module": "BBB",
+        "gender": "M",
         ...
     })
     # Returns: {"risk_score": 45, "risk_level": "medium", ...}
@@ -48,16 +57,15 @@ from src.config import get_settings
 
 class RiskPredictor:
     """
-    Singleton class for loading and using the XGBoost risk prediction model.
+    Singleton class for loading and using the CatBoost risk prediction model.
 
     Implements the Singleton pattern to ensure only one model instance is
-    loaded in memory. The model was trained on 11 behavioral features and
-    does NOT require feature scaling (XGBoost handles raw values).
+    loaded in memory. The model was trained on 12 features (5 numeric +
+    7 native categorical) and does NOT require feature scaling or encoding.
 
     Attributes:
         settings: Application settings containing model path and thresholds
-        model: The loaded XGBoost model (None until load() is called)
-        feature_list: List of feature names from training
+        model: The loaded CatBoost model (None until load() is called)
 
     Risk Level Thresholds (configurable via environment):
         - High risk: score >= 70 (default)
@@ -99,60 +107,46 @@ class RiskPredictor:
         self._initialized = True
         self.settings = get_settings()
         self.model = None
-        self.feature_list: list[str] = []
 
     def load(self) -> None:
         """
-        Load the trained XGBoost model and feature list from disk.
+        Load the trained CatBoost model from disk.
 
-        The model is loaded using joblib (efficient for scikit-learn/XGBoost).
-        The feature list is loaded from a CSV file that was saved during training.
+        The model is loaded using joblib. No feature list CSV is needed —
+        CatBoost stores its own feature names and cat_feature indices internally.
 
         Raises:
-            FileNotFoundError: If model or feature list file doesn't exist
+            FileNotFoundError: If model file doesn't exist
             Exception: If model loading fails for other reasons
         """
         self.model = joblib.load(self.settings.model_path)
-        self._load_feature_list()
 
-    def _load_feature_list(self) -> None:
-        """
-        Load the feature list from the CSV file created during training.
-
-        The feature list ensures we process features in the same order
-        they were used during model training.
-        """
-        df = pd.read_csv(self.settings.feature_list_path)
-        self.feature_list = df["feature"].tolist()
-
-    def _prepare_features(self, student_data: dict[str, Any]) -> np.ndarray:
+    def _prepare_features(self, student_data: dict[str, Any]) -> pd.DataFrame:
         """
         Prepare features for model prediction.
 
-        Transforms raw student data into the feature array format expected
-        by the XGBoost model. XGBoost doesn't require feature scaling, so
-        we pass raw values directly.
+        Builds a single-row pandas DataFrame with 12 features matching the
+        exact column order used during training. CatBoost requires a DataFrame
+        (not a numpy array) so it can match column names to its stored
+        cat_feature indices.
+
+        No encoding is applied — CatBoost handles categoricals natively.
+        Missing numeric values are filled with safe defaults.
+        Missing categorical values are filled with 'Unknown'.
 
         Feature Order (must match training):
-            1. num_of_prev_attempts (numeric)
-            2. studied_credits (numeric)
-            3. avg_score (numeric)
-            4. total_clicks (numeric)
-            5. completion_rate (numeric)
-            6-11. module_BBB through module_GGG (binary 0/1)
+            code_module, gender, region, highest_education, imd_band,
+            age_band, num_of_prev_attempts, studied_credits, disability,
+            avg_score, total_clicks, completion_rate
 
         Args:
-            student_data: Dictionary containing student metrics with keys
-                         matching the expected feature names
+            student_data: Dictionary containing student features
 
         Returns:
-            Numpy array of shape (1, 11) ready for model.predict_proba()
+            Single-row pandas DataFrame ready for model.predict_proba()
         """
-        numeric_features = self.settings.numeric_features
-        module_features = self.settings.module_features
-
-        # Safe defaults when a value is missing or NaN
-        feature_defaults = {
+        # Safe defaults for numeric features when value is missing or NaN
+        numeric_defaults = {
             "num_of_prev_attempts": 0.0,
             "studied_credits": 60.0,
             "avg_score": 50.0,
@@ -160,35 +154,65 @@ class RiskPredictor:
             "completion_rate": 0.5,
         }
 
-        numeric_values = []
-        for feat in numeric_features:
+        # Safe defaults for categorical features — 'Unknown' is a valid
+        # CatBoost category (treated as its own group, not missing)
+        categorical_defaults = {
+            "code_module": "Unknown",
+            "gender": "Unknown",
+            "region": "Unknown",
+            "highest_education": "Unknown",
+            "imd_band": "Unknown",
+            "age_band": "Unknown",
+            "disability": "Unknown",
+        }
+
+        row = {}
+
+        # Process numeric features — cast to float, replace None/NaN with default
+        for feat in self.settings.numeric_features:
             value = student_data.get(feat)
-            default = feature_defaults.get(feat, 0.0)
-            # Replace None or NaN with the safe default
+            default = numeric_defaults.get(feat, 0.0)
             if value is None:
                 value = default
             else:
                 try:
                     value = float(value)
-                    if value != value:  # NaN check (NaN != NaN is always True)
+                    if value != value:  # NaN check (NaN != NaN is True)
                         value = default
                 except (TypeError, ValueError):
                     value = default
-            numeric_values.append(value)
+            row[feat] = value
 
-        # Extract module indicators (binary 0/1)
-        module_values = []
-        for feat in module_features:
-            value = student_data.get(feat, 0)
-            try:
-                module_values.append(1 if float(value or 0) else 0)
-            except (TypeError, ValueError):
-                module_values.append(0)
+        # Process categorical features — cast to string, replace None with 'Unknown'
+        for feat in self.settings.categorical_features:
+            value = student_data.get(feat)
+            if value is None or (isinstance(value, float) and value != value):
+                value = categorical_defaults[feat]
+            else:
+                value = str(value).strip()
+                if not value:
+                    value = categorical_defaults[feat]
+            row[feat] = value
 
-        # Combine: numeric + binary module indicators (11 features total)
-        all_values = numeric_values + module_values
-        features = np.array(all_values).reshape(1, -1)
-        return features
+        # Build single-row DataFrame and reorder columns to EXACTLY match training order.
+        # The model was trained with categoricals first (indices 0-5, 8), then numerics.
+        # Passing columns in a different order causes CatBoost to misidentify which
+        # columns are categorical, producing "Invalid type for cat_feature" errors.
+        TRAINING_COLUMN_ORDER = [
+            "code_module",        # index 0  — categorical
+            "gender",             # index 1  — categorical
+            "region",             # index 2  — categorical
+            "highest_education",  # index 3  — categorical
+            "imd_band",           # index 4  — categorical
+            "age_band",           # index 5  — categorical
+            "num_of_prev_attempts",  # index 6  — numeric
+            "studied_credits",    # index 7  — numeric
+            "disability",         # index 8  — categorical
+            "avg_score",          # index 9  — numeric
+            "total_clicks",       # index 10 — numeric
+            "completion_rate",    # index 11 — numeric
+        ]
+        return pd.DataFrame([row])[TRAINING_COLUMN_ORDER]
 
     def predict(self, student_data: dict[str, Any]) -> dict[str, Any]:
         """
@@ -201,12 +225,20 @@ class RiskPredictor:
 
         Args:
             student_data: Dictionary containing student features:
+                Numeric:
                 - avg_score: Average assessment score (0-100)
                 - completion_rate: Course completion (0-1)
                 - total_clicks: LMS engagement count
                 - num_of_prev_attempts: Previous module attempts
                 - studied_credits: Credits completed
-                - module_*: Optional module indicators
+                Categorical (raw strings):
+                - code_module: e.g. 'AAA', 'BBB', ...
+                - gender: 'M' or 'F'
+                - region: e.g. 'Scotland', 'London Region', ...
+                - highest_education: e.g. 'HE Qualification'
+                - imd_band: e.g. '0-10%', '10-20%', ...
+                - age_band: '0-35', '35-55', or '55<='
+                - disability: 'Y' or 'N'
 
         Returns:
             Dictionary containing:

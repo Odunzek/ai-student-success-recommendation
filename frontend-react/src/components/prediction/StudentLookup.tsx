@@ -32,8 +32,9 @@ export function StudentLookup() {
     const query = searchQuery.toLowerCase()
     return studentsData.students
       .filter((s) => {
-        const id = s.student_id ?? ''
-        return id.toString().toLowerCase().includes(query)
+        const id = (s.student_id ?? '').toLowerCase()
+        const name = (s.name ?? '').toLowerCase()
+        return id.includes(query) || name.includes(query)
       })
       .slice(0, 8)
   }, [studentsData?.students, searchQuery])
@@ -57,7 +58,7 @@ export function StudentLookup() {
     setShowDropdown(false)
     const student = studentsData?.students.find((s) => s.id === studentId)
     if (student) {
-      setSearchQuery(student.student_id)
+      setSearchQuery(student.name ?? student.student_id)
     }
   }
 
@@ -93,7 +94,7 @@ export function StudentLookup() {
                 onKeyDown={handleKeyDown}
                 onFocus={() => searchQuery && setShowDropdown(true)}
                 onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-                placeholder="Enter student ID..."
+                placeholder="Search by name or student ID..."
                 className="w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-white placeholder:text-surface-400 dark:placeholder:text-surface-500 px-4 py-2.5 text-sm pr-10 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-400 dark:text-surface-500" />
@@ -113,7 +114,10 @@ export function StudentLookup() {
                   onClick={() => handleSelectStudent(student.id)}
                   className="w-full px-4 py-2 text-left text-sm hover:bg-surface-50 dark:hover:bg-surface-800 focus:bg-surface-50 dark:focus:bg-surface-800 focus:outline-none"
                 >
-                  <span className="font-medium">{student.student_id}</span>
+                  <span className="font-medium">{student.name ?? student.student_id}</span>
+                  {student.name && (
+                    <span className="ml-2 text-surface-400 dark:text-surface-500 text-xs">{student.student_id}</span>
+                  )}
                   {student.dropout_risk !== undefined && (
                     <span className="ml-2 text-surface-500 dark:text-surface-400">
                       ({formatPercentage(student.dropout_risk)} risk)
@@ -128,7 +132,7 @@ export function StudentLookup() {
         {/* Results */}
         {!selectedStudentId && !isPredicting && (
           <div className="text-center py-8 text-surface-500 dark:text-surface-400">
-            <p>Search for a student by ID to view their risk assessment.</p>
+            <p>Search for a student by name or ID to view their risk assessment.</p>
           </div>
         )}
 
@@ -148,8 +152,11 @@ export function StudentLookup() {
 
             <div className="text-center border-b border-surface-100 dark:border-surface-800 pb-4">
               <p className="text-sm font-medium text-surface-900 dark:text-white">
-                Student: {selectedStudent.student_id}
+                {selectedStudent.name ?? selectedStudent.student_id}
               </p>
+              {selectedStudent.name && (
+                <p className="text-xs text-surface-400 dark:text-surface-500">{selectedStudent.student_id}</p>
+              )}
               <p className="text-sm text-surface-500 dark:text-surface-400 mt-1">
                 Confidence: {formatPercentage(prediction.confidence)}
               </p>

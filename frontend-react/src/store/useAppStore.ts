@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { InterventionResult } from '../types/intervention'
 import type { ChatMessage } from '../types/chat'
 
-export type NavRoute = 'dashboard' | 'risk-assessment' | 'students' | 'interventions' | 'chat' | 'data'
+export type NavRoute = 'dashboard' | 'risk-assessment' | 'students' | 'interventions' | 'chat' | 'data' | 'help'
 
 interface AppState {
   activeRoute: NavRoute

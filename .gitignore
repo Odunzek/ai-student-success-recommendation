@@ -56,13 +56,23 @@ frontend/dist/
 
 # Data and models (large files)
 *.csv
-#*.pkl
 *.h5
 *.model
 *.joblib
-data/*.csv
-#models/*.pkl
 models/*.h5
+
+# Allow sample data for teammates (small, version-controlled reference file)
+!data/sample_students.csv
+
+# Keep raw OULAD files and runtime uploads out of git
+data/raw/*.csv
+data/processed/*.csv
+data/uploads/*.csv
+
+# PKL model files — allow production and tuned models, block old one
+# (*.pkl is NOT ignored — all .pkl files are tracked by default)
+# Explicitly exclude the old replaced model:
+models/catboost_tuned.pkl
 
 # Logs
 *.log

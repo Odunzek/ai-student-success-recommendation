@@ -1,101 +1,105 @@
-# Student Success Platform - Complete Documentation
+# Student Success Platform — Technical Documentation
 
 ## Table of Contents
 1. [Overview](#overview)
 2. [Architecture](#architecture)
 3. [Data Flow](#data-flow)
-4. [Backend (Python/FastAPI)](#backend)
-5. [Frontend (React/TypeScript)](#frontend)
+4. [Backend (FastAPI)](#backend)
+5. [Frontend (React)](#frontend)
 6. [Machine Learning Model](#machine-learning-model)
 7. [LLM Integration](#llm-integration)
 8. [API Reference](#api-reference)
-9. [Database/Data Storage](#data-storage)
+9. [Data Storage](#data-storage)
 10. [Configuration](#configuration)
+11. [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Overview
 
-The Student Success Platform is an AI-powered web application that helps educational institutions identify at-risk students and generate personalized intervention recommendations.
+The Student Success Platform is an AI-powered web application that helps educational institutions identify at-risk students and generate personalised intervention recommendations, built on the Open University Learning Analytics Dataset (OULAD).
 
 ### Key Features
-- **Risk Prediction**: Uses XGBoost ML model to predict student dropout probability
-- **Explainable AI**: SHAP values show which factors contribute to risk
-- **Smart Interventions**: Hybrid system (rules + LLM) generates personalized recommendations
-- **Dashboard**: Visual analytics of student risk distribution
-- **AI Chat**: Natural language assistant for advisors
+
+| Feature | Description |
+|---------|-------------|
+| Risk Prediction | CatBoost model (AUC 0.971) predicts dropout probability per student |
+| SHAP Explanations | Feature-level explanations for every prediction |
+| Intervention Engine | Hybrid rule-based + LLM system generating actionable plans |
+| Student Management | Full CRUD browsing with search, filter, and profile modals |
+| AI Chat (EduAssist) | OpenAI-powered assistant with session history and student context |
+| Dashboard | Live cohort stats, risk distribution, and high-priority alerts |
+| Help Page | Built-in advisor documentation and FAQ |
+| Dark Mode | Full theme support with system preference detection |
 
 ### Technology Stack
+
 | Layer | Technology |
 |-------|------------|
-| Frontend | React 18, TypeScript, Vite, Tailwind CSS |
-| Backend | Python 3.10+, FastAPI, Pydantic |
-| ML Model | XGBoost, SHAP, scikit-learn |
-| LLM | Ollama (DeepSeek-R1) |
-| State | Zustand (frontend), React Query (data fetching) |
+| Frontend | React 18, TypeScript, Vite 5, Tailwind CSS, Framer Motion |
+| Backend | Python 3.12, FastAPI, Pydantic v2, pydantic-settings |
+| ML | CatBoost 1.2, SHAP, scikit-learn, joblib |
+| LLM | OpenAI `gpt-4o-mini` via `openai` async client |
+| State | Zustand (client), React Query (server) |
+| Virtual Env | `studRec` (Python venv) |
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        FRONTEND (React)                         │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌───────┐ │
-│  │Prediction│ │ Students │ │Intervent.│ │   Chat   │ │  Data │ │
-│  │   Tab    │ │   Tab    │ │   Tab    │ │   Tab    │ │  Tab  │ │
-│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └───┬───┘ │
-│       │            │            │            │           │      │
-│       └────────────┴─────┬──────┴────────────┴───────────┘      │
-│                          │                                       │
-│                    React Query                                   │
-│                     (API Hooks)                                  │
-└──────────────────────────┬───────────────────────────────────────┘
-                           │ HTTP/REST
-                           ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                      BACKEND (FastAPI)                           │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │                      API Routes                              │ │
-│  │  /predict  /students  /dashboard  /intervention  /chat      │ │
-│  └──────┬────────┬──────────┬────────────┬───────────┬─────────┘ │
-│         │        │          │            │           │           │
-│         ▼        ▼          ▼            ▼           ▼           │
-│  ┌──────────┐ ┌──────┐ ┌────────┐ ┌───────────┐ ┌─────────┐     │
-│  │Predictor │ │Loader│ │ Stats  │ │  Hybrid   │ │   LLM   │     │
-│  │(XGBoost) │ │(CSV) │ │        │ │  Engine   │ │ Client  │     │
-│  └────┬─────┘ └──┬───┘ └────────┘ └─────┬─────┘ └────┬────┘     │
-│       │          │                      │            │           │
-│       ▼          ▼                      ▼            ▼           │
-│  ┌──────────┐ ┌──────────┐       ┌───────────┐ ┌──────────┐     │
-│  │  SHAP    │ │  Data    │       │   Rules   │ │  Ollama  │     │
-│  │Explainer │ │  Files   │       │  Engine   │ │  Server  │     │
-│  └──────────┘ └──────────┘       └───────────┘ └──────────┘     │
-└──────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                         FRONTEND (React SPA)                         │
+│                                                                      │
+│  Dashboard  Risk Assessment  Students  Interventions  Chat  Data  Help│
+│                                                                      │
+│                        React Query (API Hooks)                       │
+└────────────────────────────────┬─────────────────────────────────────┘
+                                 │ HTTP/REST  (Vite proxy /api → /api/v1)
+                                 ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                        BACKEND (FastAPI)                             │
+│                                                                      │
+│   /predict  /students  /dashboard  /intervention  /chat  /upload    │
+│                                                                      │
+│   ┌───────────┐  ┌────────┐  ┌────────────┐  ┌──────────────────┐  │
+│   │ CatBoost  │  │ Data   │  │  Hybrid    │  │   OpenAI Client  │  │
+│   │ Predictor │  │ Loader │  │  Engine    │  │  (gpt-4o-mini)   │  │
+│   │ + SHAP    │  │ (CSV)  │  │Rules + LLM │  │                  │  │
+│   └───────────┘  └────────┘  └────────────┘  └──────────────────┘  │
+│                                                                      │
+│   models/catboost_baseline_production.pkl   data/uploads/uploaded_data.csv        │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## Data Flow
 
-### 1. Data Upload Flow
+### Upload Flow
 ```
-User uploads CSV → /api/v1/upload/csv → ETL Pipeline → Data Loader → In-Memory Storage
-```
-
-### 2. Prediction Flow
-```
-Student Data → Predictor (XGBoost) → Risk Score → SHAP Explainer → Risk Factors
+User uploads CSV → POST /upload/csv → DataLoader.load() → pandas DataFrame (in-memory)
+                                    → saved to data/uploads/uploaded_data.csv
 ```
 
-### 3. Intervention Flow
+### Prediction Flow
 ```
-Risk Score → Rule Engine → Base Recommendations → LLM Enhancement → Personalized Interventions
+Student features → CatBoost.predict_proba() → risk_score (0–100)
+                → SHAP TreeExplainer       → shap_factors (per-feature contributions)
 ```
 
-### 4. Dashboard Flow
+### Intervention Flow
 ```
-Data Loader → Statistics → Risk Distribution → Frontend Charts
+risk_score + metrics → Rule Engine → base recommendations
+                     → LLM (if enabled) → personalised plan with Why/Action/Owner/Timeline
+```
+
+### Chat Flow
+```
+user message → rate limit check → input sanitize + injection detect
+             → student context injection (if student_id given):
+               fetch record + prediction + SHAP factors → injected as structured text
+             → OpenAI chat.completions → response stored in ChatStore session
 ```
 
 ---
@@ -103,602 +107,494 @@ Data Loader → Statistics → Risk Distribution → Frontend Charts
 ## Backend
 
 ### Directory Structure
+
 ```
 src/
 ├── api/
-│   ├── main.py              # FastAPI app entry point
+│   ├── main.py              # FastAPI app factory + lifespan
 │   ├── routes/
-│   │   ├── predict.py       # Prediction endpoints
-│   │   ├── students.py      # Student data endpoints
-│   │   ├── dashboard.py     # Dashboard statistics
-│   │   ├── intervention.py  # Intervention generation
-│   │   ├── chat.py          # AI chat endpoint
-│   │   └── upload.py        # File upload endpoints
+│   │   ├── predict.py       # POST /predict, POST /predict/batch
+│   │   ├── students.py      # GET /students, GET /students/{id}
+│   │   ├── dashboard.py     # GET /dashboard/stats
+│   │   ├── intervention.py  # POST /intervention
+│   │   ├── chat.py          # POST /chat, GET /chat/status, session management
+│   │   ├── upload.py        # POST /upload/csv, GET /upload/status
+│   │   └── settings.py      # GET /settings
 │   └── schemas/
-│       ├── student.py       # Student data models
-│       ├── prediction.py    # Prediction response models
-│       ├── intervention.py  # Intervention models
-│       └── chat.py          # Chat models
+│       ├── student.py       # StudentFeatures, StudentResponse
+│       ├── prediction.py    # PredictionResponse, PredictionWithExplanation
+│       ├── intervention.py  # InterventionResult, InterventionRequest
+│       └── chat.py          # ChatRequest, ChatResponse, ChatHistoryResponse
 ├── models/
-│   ├── predictor.py         # XGBoost model wrapper
-│   └── explainer.py         # SHAP explainer wrapper
+│   ├── predictor.py         # CatBoost model wrapper (singleton)
+│   └── explainer.py         # SHAP TreeExplainer wrapper (singleton)
 ├── agent/
 │   ├── rules.py             # Rule-based intervention engine
-│   ├── llm_client.py        # Ollama API client
-│   ├── prompts.py           # LLM prompt templates
-│   └── hybrid.py            # Combined rules + LLM engine
+│   ├── llm_client.py        # OpenAI async client
+│   ├── prompts.py           # All prompt templates + injection detection
+│   └── hybrid.py            # Rules + LLM combined engine
 ├── etl/
-│   ├── loader.py            # Data loading utilities
-│   └── pipeline.py          # Data transformation pipeline
-└── config.py                # Application settings
+│   └── loader.py            # CSV → in-memory DataFrame (singleton)
+├── services/
+│   └── chat_store.py        # In-memory session store with rate limiting
+└── config.py                # Settings (pydantic-settings, reads .env)
 ```
 
 ### Key Components
 
-#### 1. Predictor (`src/models/predictor.py`)
-Wraps the XGBoost model for making predictions.
+#### Predictor (`src/models/predictor.py`)
+
+Wraps `catboost_baseline_production.pkl` for predictions. Singleton via `get_predictor()`.
 
 ```python
-# Usage
 predictor = get_predictor()
-predictor.load()  # Load model from file
-result = predictor.predict(student_features)
-# Returns: {risk_score, risk_probability, risk_level, prediction}
+predictor.load()
+result = predictor.predict(student_features_dict)
+# → { risk_score, risk_probability, risk_level, prediction }
 ```
 
-**Risk Levels:**
-- `low`: risk_score < 40
-- `medium`: 40 <= risk_score < 70
-- `high`: risk_score >= 70
+**Risk thresholds** (configurable via `.env`):
 
-#### 2. Data Loader (`src/etl/loader.py`)
-Singleton class that manages student data in memory.
+| Level | Default Range |
+|-------|---------------|
+| High | ≥ 70% |
+| Medium | 40–69% |
+| Low | < 40% |
+
+#### SHAP Explainer (`src/models/explainer.py`)
+
+Computes SHAP values using `shap.TreeExplainer` on the loaded CatBoost model.
 
 ```python
-# Usage
+explainer = get_explainer()
+factors = explainer.explain(features_df)
+# → [{ feature, value, impact, direction }, ...]
+```
+
+`direction: "positive"` = increases risk, `"negative"` = decreases risk.
+
+#### Data Loader (`src/etl/loader.py`)
+
+Singleton managing the uploaded student dataset in memory.
+
+```python
 loader = get_data_loader()
-loader.load(path)           # Load CSV file
-loader.get_student(id)      # Get single student
-loader.get_all_students()   # Get paginated list
-loader.get_statistics()     # Get summary stats
+loader.load(path)                        # Load CSV
+loader.get_student(student_id)           # Single student dict
+loader.get_all_students(page, per_page, risk_level)
+loader.get_statistics()                  # Cohort summary stats
 ```
 
-#### 3. Rule Engine (`src/agent/rules.py`)
-Generates deterministic intervention recommendations based on thresholds.
+Data is persisted to `data/uploads/uploaded_data.csv` and auto-reloaded on startup if it exists.
 
-**Rules:**
-| Condition | Intervention |
-|-----------|--------------|
-| completion_rate < 30% | Critical: Assessment Completion Support |
-| completion_rate < 50% | High: Assessment Monitoring |
-| avg_score < 40 | Critical: Academic Performance Support |
-| avg_score < 50 | Medium: Performance Improvement |
-| total_clicks < 100 | High: Re-engagement Required |
-| total_clicks < 200 | Medium: Engagement Encouragement |
-| prev_attempts > 0 | Repeat Student Support |
-| risk_score >= 70 | Critical: Immediate Contact |
+#### Rule Engine (`src/agent/rules.py`)
 
-#### 4. Hybrid Engine (`src/agent/hybrid.py`)
-Combines rule-based recommendations with LLM personalization.
+Deterministic intervention rules triggered by metric thresholds:
 
-```
-Layer 1 (Rules): Always runs, provides base recommendations
-Layer 2 (LLM): Optional, enhances with personalized messaging
-```
+| Condition | Priority | Intervention |
+|-----------|----------|--------------|
+| `completion_rate < 0.30` | critical | Assessment Completion Support |
+| `completion_rate < 0.50` | high | Assessment Monitoring |
+| `avg_score < 40` | critical | Academic Performance Support |
+| `avg_score < 50` | medium | Performance Improvement Plan |
+| `total_clicks < 100` | high | Re-engagement Outreach |
+| `total_clicks < 200` | medium | Engagement Encouragement |
+| `num_of_prev_attempts > 0` | medium | Repeat Student Support |
+| `risk_score ≥ 70` | critical | Immediate Advisor Contact |
 
-**Graceful Degradation:** If LLM is unavailable, returns rule-based recommendations only.
+#### Hybrid Engine (`src/agent/hybrid.py`)
 
-#### 5. LLM Client (`src/agent/llm_client.py`)
-Communicates with Ollama server for AI text generation.
+Runs rule engine first, then optionally enhances with OpenAI.
+
+- If `use_llm=True` and key is configured → LLM personalises each intervention
+- If LLM unavailable → returns rule-based recommendations only (graceful degradation)
+
+#### LLM Client (`src/agent/llm_client.py`)
+
+Async OpenAI client using `AsyncOpenAI`.
 
 ```python
-# Usage
 client = get_llm_client()
-available = await client.is_available()  # Check if Ollama is running
-response = await client.generate(prompt, system_prompt)
+available = await client.is_available()   # True if OPENAI_API_KEY is set
+response  = await client.generate(prompt, system_prompt)
 ```
+
+Model: `gpt-4o-mini` (configurable via `OPENAI_MODEL`). Timeout: 30s (configurable).
+
+#### Chat Store (`src/services/chat_store.py`)
+
+In-memory session manager for the EduAssist chat.
+
+- Sessions expire after **24 hours** of inactivity
+- Max **50 messages** per session (oldest evicted)
+- Rate limit: **20 requests per minute** per session
+- Max **1000 concurrent sessions**
+
+#### Prompts (`src/agent/prompts.py`)
+
+All LLM prompt templates plus security utilities:
+
+| Function | Purpose |
+|----------|---------|
+| `CHAT_SYSTEM_PROMPT` | EduAssist persona and guardrails |
+| `INTERVENTION_ENHANCEMENT_TEMPLATE` | Structured intervention plan template |
+| `create_chat_prompt()` | Builds prompt with optional history and context |
+| `create_intervention_prompt()` | Builds intervention enhancement prompt |
+| `detect_injection_attempt()` | Regex-based injection pattern detection |
+| `sanitize_input()` | Strips control chars, normalises whitespace |
 
 ---
 
 ## Frontend
 
 ### Directory Structure
+
 ```
 frontend-react/src/
 ├── api/
-│   ├── client.ts            # HTTP client wrapper
+│   ├── client.ts            # fetch wrapper (GET/POST/PUT/DELETE)
 │   └── hooks/
-│       ├── usePrediction.ts # Prediction API hooks
-│       ├── useStudents.ts   # Student data hooks
-│       ├── useDashboard.ts  # Dashboard stats hooks
+│       ├── useDashboard.ts
+│       ├── useStudents.ts
+│       ├── usePrediction.ts
 │       ├── useIntervention.ts
 │       ├── useChat.ts
 │       └── useUpload.ts
 ├── components/
-│   ├── prediction/
-│   │   ├── RiskCircle.tsx       # Circular risk visualization
-│   │   ├── RiskDistribution.tsx # Donut chart + batch button
-│   │   ├── ShapFactors.tsx      # Feature importance bars
-│   │   └── StudentLookup.tsx    # Student search
-│   ├── students/
-│   │   ├── StudentTable.tsx     # Paginated student list
-│   │   └── StudentModal.tsx     # Student detail modal
-│   ├── intervention/
-│   │   ├── InterventionCard.tsx
-│   │   └── InterventionForm.tsx
-│   ├── chat/
-│   │   ├── ChatInterface.tsx
-│   │   └── ChatMessage.tsx
-│   ├── dashboard/
-│   │   └── StatCard.tsx
-│   ├── upload/
-│   │   ├── Dropzone.tsx
-│   │   └── DatasetInfo.tsx
-│   ├── layout/
-│   │   ├── Navbar.tsx
-│   │   ├── TabNav.tsx
-│   │   └── Footer.tsx
-│   └── ui/                  # Reusable UI components
-│       ├── Button.tsx
-│       ├── Card.tsx
-│       ├── Input.tsx
-│       ├── Modal.tsx
-│       ├── Alert.tsx
-│       └── Spinner.tsx
+│   ├── chat/                # ChatInterface, ChatWidget, ChatMessage
+│   ├── dashboard/           # StatCard, AlertsTable, RiskTrendChart
+│   ├── intervention/        # InterventionCard, InterventionForm
+│   ├── layout/              # AppLayout, Sidebar, TopHeader
+│   ├── prediction/          # RiskCircle, RiskDistribution, ShapFactors, StudentLookup
+│   ├── students/            # StudentTable, StudentModal
+│   ├── upload/              # Dropzone, DatasetInfo
+│   └── ui/                  # Button, Badge, Spinner, Toast, Modal
 ├── pages/
-│   ├── PredictionTab.tsx    # Risk analysis dashboard
-│   ├── StudentsTab.tsx      # Student list view
-│   ├── InterventionTab.tsx  # Intervention generator
-│   ├── ChatTab.tsx          # AI assistant
-│   └── DataTab.tsx          # Data upload
-├── types/
-│   ├── student.ts
-│   ├── prediction.ts
-│   ├── intervention.ts
-│   └── chat.ts
-├── lib/
-│   └── utils.ts             # Utility functions
+│   ├── DashboardPage.tsx
+│   ├── PredictionTab.tsx
+│   ├── StudentsTab.tsx
+│   ├── InterventionTab.tsx
+│   ├── ChatTab.tsx
+│   ├── DataTab.tsx
+│   └── HelpPage.tsx         # Built-in advisor documentation
 ├── store/
-│   └── useAppStore.ts       # Zustand global state
-├── App.tsx                  # Main app component
-└── main.tsx                 # Entry point
+│   ├── useAppStore.ts       # Zustand: routing, modals, chat/intervention state
+│   └── useThemeStore.ts     # Zustand: dark/light theme
+├── lib/
+│   ├── animations.ts        # Framer Motion variants
+│   ├── hooks.ts             # useMediaQuery, etc.
+│   └── utils.ts             # cn(), formatPercentage(), etc.
+├── types/                   # TypeScript interfaces
+└── App.tsx                  # Route registry + AnimatePresence
 ```
 
-### Key Components
+### Routing
 
-#### 1. RiskCircle
-Circular progress indicator showing dropout probability.
+Client-side routing via Zustand `activeRoute` (no React Router):
 
-```tsx
-<RiskCircle probability={0.75} size="lg" />
-// Shows 75% with "high" risk label
-// Colors: green (low), yellow (medium), red (high)
-```
-
-#### 2. RiskDistribution
-Donut chart showing breakdown of students by risk level.
-
-```tsx
-<RiskDistribution
-  stats={dashboardStats}
-  onRunBatch={handleBatchPredict}
-  isRunningBatch={isPending}
-/>
-```
-
-#### 3. ShapFactors
-Horizontal bar chart showing feature contributions to risk.
-
-```tsx
-<ShapFactors factors={[
-  { feature: "avg_score", impact: 0.15, direction: "positive" },
-  { feature: "completion_rate", impact: 0.12, direction: "negative" }
-]} />
-// Red bars = increases risk, Green bars = decreases risk
-```
-
-#### 4. StudentLookup
-Search box with autocomplete for finding students.
-
-```tsx
-<StudentLookup />
-// Searches by student_id
-// Shows RiskCircle + ShapFactors on selection
-```
+| Route | Page | Description |
+|-------|------|-------------|
+| `dashboard` | DashboardPage | Cohort overview + alerts |
+| `risk-assessment` | PredictionTab | Manual + student prediction |
+| `students` | StudentsTab | Browse all students |
+| `interventions` | InterventionTab | Generate intervention plans |
+| `chat` | ChatTab | EduAssist full-page chat |
+| `data` | DataTab | CSV upload |
+| `help` | HelpPage | Documentation and FAQ |
 
 ### State Management
 
-**React Query** handles server state:
-- Automatic caching
-- Background refetching
-- Optimistic updates
-- Query invalidation after mutations
+**React Query** — server state (caching, refetching, mutations):
+- `staleTime: 5min` on dashboard queries to reduce API calls
+- Query invalidation after uploads and predictions
 
-**Zustand** handles client state:
-- Selected tab
-- UI preferences
-- Temporary form state
+**Zustand** — client state:
+- Active route, sidebar collapse, theme
+- Student modal (open/close/selected ID)
+- Chat session persistence (messages, session ID in localStorage)
+- Intervention tab state persistence
 
-### API Hooks
+### Vite Proxy
 
-| Hook | Purpose |
-|------|---------|
-| `useDashboardStats()` | Fetch dashboard statistics |
-| `useStudents(filters)` | Fetch paginated student list |
-| `useStudent(id)` | Fetch single student |
-| `useStudentPredict(id)` | Get prediction for student |
-| `usePrediction()` | Make ad-hoc prediction |
-| `useBatchPrediction()` | Run predictions on all students |
-| `useIntervention()` | Generate interventions |
-| `useChat()` | Send chat messages |
-| `useUpload()` | Upload CSV files |
+`/api/*` → `http://localhost:8000/api/v1/*`
+
+```typescript
+// vite.config.ts
+proxy: {
+  '/api': {
+    target: 'http://localhost:8000',
+    changeOrigin: true,
+    rewrite: (path) => path.replace(/^\/api/, '/api/v1'),
+  }
+}
+```
 
 ---
 
 ## Machine Learning Model
 
-### Model: XGBoost Classifier
+### Model: CatBoost Classifier
 
-**Input Features (11 total):**
-| Feature | Type | Range | Description |
-|---------|------|-------|-------------|
-| num_of_prev_attempts | int | 0-10 | Previous module attempts |
-| studied_credits | int | 0-360 | Credits enrolled |
-| avg_score | float | 0-100 | Average assessment score |
-| total_clicks | int | 0+ | VLE platform interactions |
-| completion_rate | float | 0-1 | Assessment completion ratio |
-| module_BBB | binary | 0/1 | Enrolled in module BBB |
-| module_CCC | binary | 0/1 | Enrolled in module CCC |
-| module_DDD | binary | 0/1 | Enrolled in module DDD |
-| module_EEE | binary | 0/1 | Enrolled in module EEE |
-| module_FFF | binary | 0/1 | Enrolled in module FFF |
-| module_GGG | binary | 0/1 | Enrolled in module GGG |
+**File:** `models/catboost_baseline_production.pkl`
+
+CatBoost was selected after a full tuned comparison against XGBoost, Random Forest, and Logistic Regression on OULAD data. It handles categorical features natively — no one-hot encoding needed.
+
+**Training pipeline** (see `notebooks/notebook.ipynb` — full pipeline with EDA, model comparison, and hyperparameter tuning. Legacy exploratory notebook archived as `notebooks/notebook_legacy.ipynb`):
+
+1. ETL — merge OULAD relational tables → `student_features.csv`
+2. Feature engineering — `completion_rate`, `total_clicks`, module dummies
+3. Baseline comparison — 4 models evaluated (XGBoost won baseline; CatBoost tuned via `randomized_search`)
+4. Model comparison — CatBoost baseline vs tuned vs Random Forest vs Logistic Regression
+5. Model selection — CatBoost **baseline** chosen for production: Recall 0.9009 > Tuned 0.8983
+6. SHAP explainability — TreeExplainer generates per-feature SHAP values at prediction time
+
+**Test set performance:**
+
+| Metric | CatBoost Baseline (Production) |
+|--------|---------------------------------|
+| AUC-ROC | 0.9780 |
+| Recall (at-risk) | **0.9009** — primary metric |
+| F1-Score | 0.913 |
+| Accuracy | 0.911 |
+| Precision | 0.86 |
+
+**Input features (CatBoost — raw, unencoded):**
+
+| Feature | Type | Description |
+|---------|------|-------------|
+| `code_module` | categorical | Course module code (AAA–GGG) |
+| `gender` | categorical | M / F |
+| `region` | categorical | Student's UK region |
+| `highest_education` | categorical | Highest prior qualification |
+| `imd_band` | categorical | Index of Multiple Deprivation band |
+| `age_band` | categorical | Age group |
+| `disability` | categorical | Disability status |
+| `num_of_prev_attempts` | int | Previous module attempts |
+| `studied_credits` | int | Credits enrolled |
+| `avg_score` | float | Mean assessment score |
+| `total_clicks` | int | VLE platform interactions |
+| `completion_rate` | float | Assessments completed / total |
 
 **Output:**
 ```json
 {
-  "risk_score": 75,           // 0-100 percentage
-  "risk_probability": 0.75,   // 0-1 raw probability
-  "risk_level": "high",       // low/medium/high
-  "prediction": 1             // 0=not at risk, 1=at risk
+  "risk_score": 75,
+  "risk_probability": 0.75,
+  "risk_level": "high",
+  "prediction": 1
 }
 ```
-
-### SHAP Explanations
-
-SHAP (SHapley Additive exPlanations) shows how each feature contributes to the prediction.
-
-**Example Output:**
-```json
-{
-  "shap_factors": [
-    {"feature": "avg_score", "value": 35, "impact": 0.25, "direction": "positive"},
-    {"feature": "completion_rate", "value": 0.3, "impact": 0.18, "direction": "positive"},
-    {"feature": "total_clicks", "value": 150, "impact": 0.12, "direction": "positive"}
-  ]
-}
-```
-
-- **direction: positive** = increases dropout risk
-- **direction: negative** = decreases dropout risk
-- **impact** = magnitude of effect (higher = more important)
 
 ### Model Files
+
 ```
 models/
-├── xgboost_final.joblib    # Trained XGBoost model
-├── scaler.joblib           # Feature scaler
-└── feature_list.csv        # Feature names
+├── catboost_baseline_production.pkl  ← production model (loaded by app)
+├── catboost_full_tuned.pkl           ← tuned variant (higher precision, lower recall — not used in production)
+├── model_comparison_results.csv      ← 4-model comparison results
+└── best_params.csv                   ← CatBoost tuning hyperparameters
 ```
 
 ---
 
 ## LLM Integration
 
-The platform supports two LLM providers for AI-enhanced interventions and chat.
+### Provider: OpenAI (gpt-4o-mini)
 
-### Option A: OpenAI API (Recommended)
-
-**Default Model:** `gpt-4o-mini`
+The platform uses the OpenAI API exclusively for both chat and intervention enhancement.
 
 **Setup:**
-1. Get an API key from [OpenAI Platform](https://platform.openai.com/api-keys)
-2. Add to your `.env` file:
 ```env
-LLM_PROVIDER=openai
-OPENAI_API_KEY=sk-your-api-key-here
-OPENAI_MODEL=gpt-4o-mini
+OPENAI_API_KEY=sk-your-key-here
+OPENAI_MODEL=gpt-4o-mini   # default
+LLM_TIMEOUT=30.0
+LLM_ENABLED=true
 ```
 
-### Option B: Ollama (Local/Free)
+**Availability check** — `is_available()` returns `True` if `OPENAI_API_KEY` is non-empty. Authentication errors surface as `None` responses from `generate()`, which the routes handle gracefully.
 
-**Default Model:** `deepseek-r1:1.5b`
+### Chat — EduAssist
 
-**Installation:**
-```bash
-# Install Ollama
-curl -fsSL https://ollama.ai/install.sh | sh
+**Endpoint:** `POST /api/v1/chat`
 
-# Pull model
-ollama pull deepseek-r1:1.5b
-
-# Start server
-ollama serve
+**Request:**
+```json
+{
+  "message": "Why is this student high risk?",
+  "student_id": "12345",
+  "session_id": "uuid-optional",
+  "context": "optional extra context"
+}
 ```
 
-Then set in `.env`:
-```env
-LLM_PROVIDER=ollama
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=deepseek-r1:1.5b
+If `student_id` is provided, the handler automatically loads that student's metrics and risk prediction as context before calling the LLM.
+
+**Security:**
+- Prompt injection detection (regex patterns: role override, instruction bypass, jailbreaks)
+- Input sanitisation (control char removal, whitespace normalisation, 2000 char limit)
+- Rate limiting: 20 req/min per session
+
+**Conversation memory:** Last 10 messages (up to 1500 chars each) included in every prompt for multi-turn coherence.
+
+### Interventions — LLM Enhancement
+
+**Endpoint:** `POST /api/v1/intervention` with `use_llm: true`
+
+The LLM receives the student's metrics + rule-based recommendations and returns a structured plan:
+
+```
+SUMMARY: [root cause analysis]
+
+INTERVENTIONS:
+1. **Title**
+   Why: ...    Action: ...    Owner: ...    Timeline: ...    Success: ...
 ```
 
-### Prompts
-
-#### System Prompt (Intervention)
-```
-You are an academic advisor at Cambrian College. Be empathetic,
-specific, and action-oriented. Keep responses brief.
-```
-
-#### Intervention Enhancement Template
-```
-Student metrics: Risk {risk_score}% ({risk_level}),
-Completion {completion_rate:.0%}, Avg Score {avg_score:.0f}%,
-Engagement {total_clicks} clicks.
-
-Current recommendations:
-{rule_recommendations}
-
-Respond in this exact format:
-SUMMARY: [1-2 sentence personalized assessment]
-
-ENHANCED:
-1. [Enhanced first intervention - 1 sentence]
-2. [Enhanced second intervention - 1 sentence]
-```
-
-#### Chat System Prompt
-```
-You are an AI assistant for the Cambrian College Student Success Platform.
-You help advisors understand student risk data and intervention strategies.
-
-Keep responses concise (2-4 sentences). Be helpful and practical.
-```
-
-### Graceful Degradation
-
-If no LLM provider is available:
-1. `is_available()` returns false (missing API key or Ollama not running)
-2. Intervention endpoint uses rules-only mode
-3. Chat endpoint returns "AI assistant unavailable" message
-4. App continues to function without LLM features
-
-**Provider Selection Logic:**
-- If `LLM_PROVIDER=openai` and `OPENAI_API_KEY` is set → Use OpenAI
-- If `LLM_PROVIDER=ollama` or OpenAI not configured → Use Ollama
-- If neither available → Fall back to rules-only
+If `use_llm: false` or the API is unavailable, rule-based recommendations are returned directly (`llm_enhanced: false`).
 
 ---
 
 ## API Reference
 
-### Base URL
-```
-http://localhost:8000/api/v1
-```
+**Base URL:** `http://localhost:8000/api/v1`
 
-### Endpoints
-
-#### Health Check
+### Health
 ```
 GET /health
-Response: { "status": "healthy", "model_loaded": true }
+→ { "status": "healthy", "model_loaded": true }
 ```
 
-#### Dashboard
+### Dashboard
 ```
 GET /dashboard/stats
-Response: {
-  "total_students": 30,
-  "high_risk_count": 5,
-  "medium_risk_count": 10,
-  "low_risk_count": 15,
-  "avg_dropout_probability": 0.35,
-  "model_accuracy": 0.91
-}
+→ { total_students, high_risk_count, medium_risk_count, low_risk_count,
+    avg_dropout_probability, model_accuracy }
 ```
 
-#### Students
-```
-GET /students?page=1&per_page=10&risk_level=high
-Response: {
-  "students": [...],
-  "total": 100,
-  "page": 1,
-  "per_page": 10,
-  "total_pages": 10
-}
-
-GET /students/{id}
-Response: { "student": {...} }
-
-GET /students/{id}/predict
-Response: {
-  "dropout_probability": 0.72,
-  "risk_level": "high",
-  "confidence": 0.85,
-  "shap_factors": [...]
-}
-```
-
-#### Prediction
+### Prediction
 ```
 POST /predict
-Body: { feature values }
-Response: { risk_score, risk_probability, risk_level, prediction }
+Body: { num_of_prev_attempts, studied_credits, avg_score, total_clicks,
+        completion_rate, code_module, gender, region, highest_education,
+        imd_band, age_band, disability }
+→ { risk_score, risk_probability, risk_level, prediction, shap_factors[] }
 
 POST /predict/batch
-Response: {
-  "processed": 30,
-  "high_risk": 5,
-  "medium_risk": 10,
-  "low_risk": 15
-}
+→ { processed, high_risk, medium_risk, low_risk, errors }
 ```
 
-#### Intervention
+### Students
+```
+GET /students?page=1&per_page=20&risk_level=high&search=
+→ { students[], total, page, per_page, total_pages }
+
+GET /students/{id}
+→ { student: { ...features } }
+
+GET /students/{id}/predict
+→ { dropout_probability, risk_level, confidence, shap_factors[] }
+```
+
+### Interventions
 ```
 POST /intervention
-Body: {
-  "risk_score": 75,
-  "completion_rate": 0.3,
-  "avg_score": 45,
-  "total_clicks": 150,
-  "use_llm": true
-}
-Response: {
-  "risk_level": "high",
-  "summary": "...",
-  "interventions": [...],
-  "llm_enhanced": true
-}
+Body: { risk_score, completion_rate, avg_score, total_clicks,
+        studied_credits, num_of_prev_attempts, use_llm,
+        student_name?, module_name?, shap_factors[]? }
+→ { risk_level, summary, interventions[], llm_enhanced }
 ```
 
-#### Chat
+### Chat
 ```
 POST /chat
-Body: { "message": "How should I help a high-risk student?", "context": "..." }
-Response: { "response": "...", "llm_available": true }
+Body: { message, student_id?, session_id?, context? }
+→ { response, llm_available, session_id, flagged, flag_reason? }
 
 GET /chat/status
-Response: { "available": true, "message": "AI assistant is ready" }
+→ { available, message }
+
+POST /chat/session
+→ { session_id, message }
+
+GET  /chat/history/{session_id}
+→ { session_id, messages[], message_count }
+
+DELETE /chat/history/{session_id}
+→ { success, message }
+
+GET /chat/stats
+→ { total_sessions, max_sessions, session_timeout_hours, rate_limit }
 ```
 
-#### Upload
+### Upload
 ```
-POST /upload/csv
-Body: FormData with file
-Response: { "message": "...", "rows_processed": 30, "filename": "..." }
+POST /upload/csv        (multipart/form-data)
+→ { message, rows_processed, filename }
 
 GET /upload/status
-Response: { "has_data": true, "row_count": 30, "last_upload": "..." }
+→ { has_data, row_count, columns[], last_upload }
 
 DELETE /upload/data
-Response: { "success": true, "message": "Data cleared" }
+→ { success, message }
 ```
 
 ---
 
 ## Data Storage
 
-### In-Memory Storage
+### In-Memory (runtime)
 
-The app uses in-memory storage (pandas DataFrame) for student data.
+Student data is held in a pandas DataFrame loaded from CSV. No database required.
 
-**Why In-Memory?**
-- Fast queries for small-medium datasets
-- No database setup required
-- Suitable for demo/POC purposes
+- **Loaded at:** startup (if `data/uploads/uploaded_data.csv` exists) or via upload
+- **Reset at:** server restart (unless upload file exists)
 
-**Limitations:**
-- Data lost on server restart
-- Not suitable for large datasets (>100k records)
-- No persistence
-
-**For Production:**
-Consider adding PostgreSQL or MongoDB for persistent storage.
-
-### File Storage
+### File System
 
 ```
 data/
+├── raw/                         # Original OULAD CSV files
+│   ├── studentInfo.csv
+│   ├── studentAssessment.csv
+│   ├── studentVle.csv
+│   ├── assessments.csv
+│   ├── courses.csv
+│   ├── studentRegistration.csv
+│   └── vle.csv
 ├── processed/
-│   └── student_features.csv    # Default dataset (not auto-loaded)
-├── uploads/
-│   └── uploaded_data.csv       # User uploaded data
-└── sample_students.csv         # Sample test data
+│   ├── student_features.csv     # Merged feature dataset (unencoded)
+│   └── student_features_encoded.csv  # One-hot encoded (for XGBoost)
+└── uploads/
+    └── uploaded_data.csv        # Persisted upload (auto-reloaded on restart)
 ```
 
 ---
 
 ## Configuration
 
-### Environment Variables
+All settings live in `src/config.py` (Pydantic `BaseSettings`) and are read from `.env`:
 
-Create `.env` file in project root:
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `API_TITLE` | Student Success Platform API | Swagger title |
+| `API_VERSION` | 1.0.0 | API version string |
+| `API_PREFIX` | /api/v1 | URL prefix for all routes |
+| `DEBUG` | false | FastAPI debug mode |
+| `OPENAI_API_KEY` | None | OpenAI key (required for LLM features) |
+| `OPENAI_MODEL` | gpt-4o-mini | OpenAI model ID |
+| `OPENAI_BASE_URL` | None | Optional Azure/proxy override |
+| `LLM_TIMEOUT` | 30.0 | OpenAI request timeout (seconds) |
+| `LLM_ENABLED` | true | Global LLM on/off switch |
+| `RISK_THRESHOLD_HIGH` | 70 | Score ≥ this → high risk |
+| `RISK_THRESHOLD_MEDIUM` | 40 | Score ≥ this → medium risk |
+| `MODEL_ACCURACY` | None | Optional override shown in UI |
 
-```env
-# API Settings
-API_TITLE=Student Success Platform API
-API_VERSION=1.0.0
-API_PREFIX=/api/v1
-DEBUG=false
+**Model paths** (relative to project root, auto-resolved):
 
-# LLM Settings
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=deepseek-r1:1.5b
-LLM_TIMEOUT=120.0
-LLM_ENABLED=true
-```
-
-### Vite Proxy
-
-Frontend proxy configuration (`vite.config.ts`):
-
-```typescript
-server: {
-  port: 5173,
-  proxy: {
-    '/api': {
-      target: 'http://localhost:8000',
-      changeOrigin: true,
-      rewrite: (path) => path.replace(/^\/api/, '/api/v1'),
-    },
-  },
-}
-```
-
-This maps:
-- Frontend `/api/*` → Backend `/api/v1/*`
-
----
-
-## Running the Application
-
-### Development
-
-**Terminal 1 - Backend:**
-```bash
-cd ai-student-success
-source venv/bin/activate  # or venv\Scripts\activate on Windows
-uvicorn src.api.main:app --reload --port 8000
-```
-
-**Terminal 2 - Frontend:**
-```bash
-cd ai-student-success/frontend-react
-npm run dev
-```
-
-**Terminal 3 - Ollama (optional):**
-```bash
-ollama serve
-```
-
-### URLs
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:8000
-- API Docs: http://localhost:8000/docs
-- Ollama: http://localhost:11434
-
-### Testing the App
-
-1. **Upload Data:** Go to Data tab, upload `data/sample_students.csv`
-2. **View Dashboard:** Go to Prediction tab, see risk distribution
-3. **Search Student:** Use Student Lookup to find a student
-4. **Generate Interventions:** Go to Intervention tab
-5. **Chat:** Go to Chat tab to ask the AI assistant questions
+| Setting | Default Path |
+|---------|-------------|
+| `model_path` | `models/catboost_baseline_production.pkl` |
+| `student_data_path` | `data/processed/student_features.csv` |
 
 ---
 
@@ -706,20 +602,11 @@ ollama serve
 
 | Problem | Solution |
 |---------|----------|
-| 503 errors | Data not loaded - upload CSV first |
-| 404 on API calls | Check backend is running on port 8000 |
-| Empty LLM responses | Check `ollama list` for model, increase timeout |
-| CORS errors | Ensure Vite proxy is configured correctly |
-| Model not found | Check `models/` folder has joblib files |
-| Upload fails | Check CSV has required columns |
-
----
-
-## Future Enhancements
-
-1. **Database Integration** - PostgreSQL for persistent storage
-2. **Authentication** - User login and role-based access
-3. **Email Notifications** - Alert advisors about high-risk students
-4. **Batch Import** - Schedule automatic data imports
-5. **Reporting** - Export PDF reports
-6. **Mobile App** - React Native companion app
+| `ModuleNotFoundError: catboost` | Ensure `studRec` venv is active: `source studRec/Scripts/activate` |
+| AI chat shows offline | Set valid `OPENAI_API_KEY` in `.env`, restart backend |
+| 404 on `/api/v1/chat/status` | Stale process on port 8000 — kill old processes via Task Manager or `taskkill` |
+| Dashboard empty | Upload a CSV via Data Upload first |
+| Upload fails with column error | Ensure CSV contains all required feature columns |
+| SHAP explainer warns on startup | Non-critical — predictions still work; SHAP initialises lazily |
+| Kernel `No module named catboost` in notebook | Select the `studRec` Python interpreter in VS Code's kernel picker |
+| Multiple processes on port 8000 | `powershell.exe -Command "Stop-Process -Id <PID> -Force"` |

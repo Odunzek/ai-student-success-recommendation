@@ -1,35 +1,19 @@
+// Matches the 12-feature contract of catboost_baseline_production.pkl
 export interface PredictionInput {
+  // Numeric features
+  num_of_prev_attempts: number
+  studied_credits: number
+  avg_score: number
+  total_clicks: number
+  completion_rate: number
+  // Categorical features (raw strings — no encoding needed)
+  code_module: string
   gender: string
-  age: number
-  address: string
-  family_size: string
-  parental_status: string
-  mother_education: number
-  father_education: number
-  mother_job: string
-  father_job: string
-  reason: string
-  guardian: string
-  travel_time: number
-  study_time: number
-  failures: number
-  school_support: boolean
-  family_support: boolean
-  extra_paid: boolean
-  activities: boolean
-  nursery: boolean
-  higher: boolean
-  internet: boolean
-  romantic: boolean
-  family_relations: number
-  free_time: number
-  social: number
-  weekday_alcohol: number
-  weekend_alcohol: number
-  health: number
-  absences: number
-  g1: number
-  g2: number
+  region: string
+  highest_education: string
+  imd_band: string
+  age_band: string
+  disability: string
 }
 
 export interface ShapFactor {
@@ -39,11 +23,13 @@ export interface ShapFactor {
   direction: 'positive' | 'negative'
 }
 
+// Matches /predict/explain API response
 export interface PredictionResult {
-  dropout_probability: number
+  risk_score: number          // 0–100 integer
+  risk_probability: number    // 0–1 float (raw model output)
   risk_level: 'low' | 'medium' | 'high'
-  shap_factors: ShapFactor[]
-  confidence: number
+  prediction: number          // 0 or 1
+  top_factors: ShapFactor[] | null
 }
 
 export interface DashboardStats {

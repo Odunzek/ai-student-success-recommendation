@@ -11,6 +11,7 @@ import {
   LogOut,
   Sun,
   Moon,
+  HelpCircle,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useEffect } from 'react'
@@ -25,7 +26,8 @@ const navItems = [
   { route: 'students' as NavRoute, label: 'Student Management', icon: Users },
   { route: 'interventions' as NavRoute, label: 'Interventions', icon: Lightbulb },
   { route: 'chat' as NavRoute, label: 'AI Chat Interface', icon: MessageSquare },
-  { route: 'data' as NavRoute, label: 'Data Upload', icon: Database },
+  { route: 'data' as NavRoute, label: 'Data Upload',         icon: Database },
+  { route: 'help' as NavRoute, label: 'Help & Documentation', icon: HelpCircle },
 ]
 
 export function Sidebar() {

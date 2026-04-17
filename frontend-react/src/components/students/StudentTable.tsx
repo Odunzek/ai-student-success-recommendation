@@ -37,13 +37,13 @@ export function StudentTable({
                 Student
               </th>
               <th className="text-left py-4 px-4 text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">
-                Age
+                Module
               </th>
               <th className="text-left py-4 px-4 text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">
-                Grades
+                Avg Score
               </th>
               <th className="text-left py-4 px-4 text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">
-                Absences
+                Completion
               </th>
               <th className="text-left py-4 px-4 text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">
                 Risk
@@ -69,41 +69,57 @@ export function StudentTable({
                   className="border-b border-surface-100 dark:border-surface-800 hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors group"
                   whileHover={{ x: 4 }}
                 >
+                  {/* Name / ID + gender */}
                   <td className="py-4 px-4">
                     <div className="flex items-center gap-3">
                       <motion.div
-                        className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900/50 dark:to-primary-800/50 flex items-center justify-center"
+                        className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900/50 dark:to-primary-800/50 flex items-center justify-center flex-shrink-0"
                         whileHover={{ scale: 1.1, rotate: 5 }}
                       >
                         <User className="h-4 w-4 text-primary-600 dark:text-primary-400" />
                       </motion.div>
                       <div>
                         <p className="text-sm font-semibold text-surface-900 dark:text-white">
-                          {student.student_id}
+                          {student.name ?? student.student_id}
                         </p>
                         <p className="text-xs text-surface-500 dark:text-surface-400">
-                          {student.gender === 'M' ? 'Male' : 'Female'}
+                          {student.student_id}
+                          {student.gender ? ` · ${student.gender === 'M' ? 'Male' : 'Female'}` : ''}
                         </p>
                       </div>
                     </div>
                   </td>
+
+                  {/* Module */}
                   <td className="py-4 px-4">
-                    <span className="text-sm font-medium text-surface-700 dark:text-surface-300">
-                      {student.age} years
-                    </span>
+                    {student.code_module ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
+                        {student.code_module}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-surface-400 dark:text-surface-600">—</span>
+                    )}
                   </td>
+
+                  {/* Avg Score */}
                   <td className="py-4 px-4">
-                    <div className="flex items-center gap-2">
-                      <GradePill label="G1" value={student.g1} />
-                      <GradePill label="G2" value={student.g2} />
-                      <GradePill label="G3" value={student.g3} />
-                    </div>
+                    {student.avg_score != null ? (
+                      <ScorePill value={Number(student.avg_score)} />
+                    ) : (
+                      <span className="text-sm text-surface-400 dark:text-surface-600">—</span>
+                    )}
                   </td>
+
+                  {/* Completion Rate */}
                   <td className="py-4 px-4">
-                    <span className="text-sm font-medium text-surface-700 dark:text-surface-300">
-                      {student.absences}
-                    </span>
+                    {student.completion_rate != null ? (
+                      <CompletionBar value={Number(student.completion_rate)} />
+                    ) : (
+                      <span className="text-sm text-surface-400 dark:text-surface-600">—</span>
+                    )}
                   </td>
+
+                  {/* Risk Badge */}
                   <td className="py-4 px-4">
                     <Badge variant={getRiskBadgeVariant(student.dropout_risk)} animate>
                       {student.dropout_risk !== undefined
@@ -111,6 +127,8 @@ export function StudentTable({
                         : 'N/A'}
                     </Badge>
                   </td>
+
+                  {/* Actions */}
                   <td className="py-4 px-4 text-right">
                     <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                       <Button
@@ -167,20 +185,32 @@ export function StudentTable({
   )
 }
 
-function GradePill({ label, value }: { label: string; value: number | undefined }) {
-  const getGradeColor = (grade: number | undefined) => {
-    if (grade === undefined) return 'bg-surface-100 text-surface-500 dark:bg-surface-800 dark:text-surface-400'
-    if (grade >= 15) return 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400'
-    if (grade >= 10) return 'bg-warning-100 text-warning-700 dark:bg-warning-900/30 dark:text-warning-400'
-    return 'bg-danger-100 text-danger-700 dark:bg-danger-900/30 dark:text-danger-400'
-  }
+// --- Sub-components ---
 
+function ScorePill({ value }: { value: number }) {
+  const color =
+    value >= 70 ? 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400' :
+    value >= 50 ? 'bg-warning-100 text-warning-700 dark:bg-warning-900/30 dark:text-warning-400' :
+                  'bg-danger-100 text-danger-700 dark:bg-danger-900/30 dark:text-danger-400'
   return (
-    <span
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium ${getGradeColor(value)}`}
-    >
-      <span className="opacity-70">{label}:</span>
-      <span>{value ?? '-'}</span>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium ${color}`}>
+      {value.toFixed(1)}
     </span>
+  )
+}
+
+function CompletionBar({ value }: { value: number }) {
+  const pct = Math.round(value * 100)
+  const color =
+    pct >= 80 ? 'bg-success-500' :
+    pct >= 50 ? 'bg-warning-500' :
+                'bg-danger-500'
+  return (
+    <div className="flex items-center gap-2 min-w-[80px]">
+      <div className="flex-1 h-1.5 rounded-full bg-surface-200 dark:bg-surface-700 overflow-hidden">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+      <span className="text-xs text-surface-500 dark:text-surface-400 w-8 text-right">{pct}%</span>
+    </div>
   )
 }

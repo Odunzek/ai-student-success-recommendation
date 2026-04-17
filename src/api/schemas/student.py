@@ -4,9 +4,14 @@ from pydantic import BaseModel, Field
 
 
 class StudentFeatures(BaseModel):
-    """Input schema for student features used in prediction."""
+    """Input schema for student features used in prediction.
 
-    # Numeric features (will be scaled)
+    Matches the 12-feature contract of catboost_baseline_production.pkl:
+      - 5 numeric features
+      - 7 categorical features (raw strings — no encoding needed)
+    """
+
+    # Numeric features
     num_of_prev_attempts: int = Field(
         default=0,
         ge=0,
@@ -35,13 +40,35 @@ class StudentFeatures(BaseModel):
         description="Assessment completion rate (0-1)"
     )
 
-    # Module indicators (binary)
-    module_BBB: bool = Field(default=False, description="Enrolled in module BBB")
-    module_CCC: bool = Field(default=False, description="Enrolled in module CCC")
-    module_DDD: bool = Field(default=False, description="Enrolled in module DDD")
-    module_EEE: bool = Field(default=False, description="Enrolled in module EEE")
-    module_FFF: bool = Field(default=False, description="Enrolled in module FFF")
-    module_GGG: bool = Field(default=False, description="Enrolled in module GGG")
+    # Categorical features — passed as raw strings to CatBoost
+    code_module: str = Field(
+        default="Unknown",
+        description="Module code (e.g. 'AAA', 'BBB', 'CCC', 'DDD', 'EEE', 'FFF', 'GGG')"
+    )
+    gender: str = Field(
+        default="Unknown",
+        description="Student gender: 'M' or 'F'"
+    )
+    region: str = Field(
+        default="Unknown",
+        description="Geographic region (e.g. 'Scotland', 'London Region', 'South East Region')"
+    )
+    highest_education: str = Field(
+        default="Unknown",
+        description="Highest education level (e.g. 'HE Qualification', 'A Level or Equivalent')"
+    )
+    imd_band: str = Field(
+        default="Unknown",
+        description="Index of Multiple Deprivation band (e.g. '0-10%', '10-20%', ..., '90-100%')"
+    )
+    age_band: str = Field(
+        default="Unknown",
+        description="Age band: '0-35', '35-55', or '55<='"
+    )
+    disability: str = Field(
+        default="Unknown",
+        description="Disability status: 'Y' or 'N'"
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -52,12 +79,13 @@ class StudentFeatures(BaseModel):
                     "total_clicks": 150,
                     "studied_credits": 60,
                     "num_of_prev_attempts": 0,
-                    "module_BBB": False,
-                    "module_CCC": False,
-                    "module_DDD": False,
-                    "module_EEE": False,
-                    "module_FFF": False,
-                    "module_GGG": False,
+                    "code_module": "BBB",
+                    "gender": "M",
+                    "region": "Scotland",
+                    "highest_education": "A Level or Equivalent",
+                    "imd_band": "20-30%",
+                    "age_band": "35-55",
+                    "disability": "N",
                 }
             ]
         }

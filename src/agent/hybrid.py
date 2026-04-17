@@ -36,6 +36,7 @@ class HybridEngine:
         num_of_prev_attempts: int = 0,
         student_name: str | None = None,
         module_name: str | None = None,
+        shap_factors: list[dict] | None = None,
     ) -> dict:
         """Generate interventions using hybrid approach.
 
@@ -63,6 +64,7 @@ class HybridEngine:
             total_clicks=total_clicks,
             studied_credits=studied_credits,
             num_of_prev_attempts=num_of_prev_attempts,
+            shap_factors=shap_factors,
         )
 
         # Check if LLM is enabled and available
@@ -88,6 +90,7 @@ class HybridEngine:
                 interventions=rule_result["interventions"],
                 student_name=student_name,
                 module_name=module_name,
+                shap_factors=shap_factors,
             )
 
             # Get LLM response

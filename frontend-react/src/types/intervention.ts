@@ -1,3 +1,10 @@
+export interface ShapFactor {
+  feature: string
+  impact: number
+  direction: string
+  value?: number
+}
+
 export interface InterventionInput {
   risk_score: number          // 0-100
   completion_rate?: number    // 0-1
@@ -8,6 +15,7 @@ export interface InterventionInput {
   student_name?: string
   module_name?: string
   use_llm?: boolean
+  shap_factors?: ShapFactor[]  // top model drivers — makes LLM interventions target the right features
 }
 
 export interface Intervention {

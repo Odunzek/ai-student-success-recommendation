@@ -69,7 +69,7 @@ uvicorn src.api.main:app --reload --port 8000
 
 Expected output:
 ```
-[OK] Model loaded from models/xgboost_final.joblib
+[OK] Model loaded from models/catboost_baseline_production.pkl
 [OK] SHAP explainer initialized
 INFO: Uvicorn running on http://127.0.0.1:8000
 ```
@@ -143,9 +143,8 @@ ai-student-success/
 │   └── vite.config.ts      # Vite config with API proxy
 │
 ├── models/                 # Pre-trained ML models
-│   ├── xgboost_final.joblib
-│   ├── scaler.joblib
-│   └── feature_list.csv
+│   ├── catboost_baseline_production.pkl  ← production model
+│   └── catboost_full_tuned.pkl           ← tuned variant (reference)
 │
 ├── data/                   # Data files
 │   ├── processed/          # Ready-to-use features
@@ -221,9 +220,7 @@ cd frontend-react && npm run build
 
 ### Model not found
 Ensure `models/` folder contains:
-- `xgboost_final.joblib`
-- `scaler.joblib`
-- `feature_list.csv`
+- `catboost_baseline_production.pkl`
 
 ### CORS errors
 Vite proxy handles API calls. Ensure `vite.config.ts` has:
@@ -251,7 +248,7 @@ Frontend: `npm run dev -- --port 5174`
 
 **Backend:**
 - FastAPI (REST API)
-- XGBoost (risk prediction)
+- CatBoost (risk prediction, native categorical handling)
 - SHAP (model explainability)
 - OpenAI/Ollama (LLM interventions)
 
@@ -268,15 +265,18 @@ Frontend: `npm run dev -- --port 5174`
 
 The platform uses the Open University Learning Analytics Dataset (OULAD).
 
-**Required features:**
-- `num_of_prev_attempts`
-- `studied_credits`
-- `avg_score`
-- `total_clicks`
-- `completion_rate`
-- Module indicators (module_BBB, module_CCC, etc.)
+**Required CSV columns:**
 
-Processed data should be in `data/processed/student_features_encoded.csv`.
+Numeric:
+- `num_of_prev_attempts`, `studied_credits`, `avg_score`, `total_clicks`, `completion_rate`
+
+Categorical (raw strings — no encoding needed):
+- `code_module` (e.g. AAA, BBB), `gender` (M/F), `region`, `highest_education`, `imd_band`, `age_band`, `disability` (Y/N)
+
+Optional:
+- `name` — student display name; falls back to `student_id` if absent
+
+Upload via the **Data Upload** tab or place a file at `data/uploads/uploaded_data.csv` for auto-load on startup. A sample is available at `data/sample_students.csv`.
 
 ---
 
