@@ -1,89 +1,80 @@
 # Architecture Decision Records (ADR)
 
-## ADR-001: Use DeepSeek-R1:8b for LLM
-**Date**: 2025-01-28
+## ADR-001: LLM Provider — OpenAI Primary, Ollama Fallback
+**Date**: 2025-01-28 | **Revised**: 2025-04-16
 **Status**: ACTIVE
-**Decision**: Use DeepSeek-R1 locally
-**Reason**: Privacy-preserving, no API costs
-**Impact**: Requires local model hosting
+**Decision**: OpenAI `gpt-4o-mini` is the primary LLM. Ollama (e.g. `deepseek-r1:1.5b`) is supported as a local/free alternative via `LLM_PROVIDER=ollama` in `.env`.
+**Reason**: OpenAI gives better response quality; Ollama allows offline/cost-free demos. Both share the same async client interface.
+**Impact**: Requires `OPENAI_API_KEY` for full quality; Ollama requires local install but has no ongoing cost.
 
 ---
 
-## ADR-002: Batch Processing (Not Real-Time)
-**Date**: 2025-01-29
+## ADR-002: On-Demand Predictions (Batch Processing Deferred)
+**Date**: 2025-01-29 | **Revised**: 2025-04-16
+**Status**: REVISED — predictions run on-demand per student request. Scheduled batch scans are a planned future feature.
+**Decision**: Risk scores are computed at request time (when an advisor views a student or the list loads), not on a 24-hour schedule.
+**Reason**: Simpler to implement correctly; avoids stale cached scores; batch scan can be added later as a background job.
+**Impact**: Slightly higher per-request latency (~100–300ms for CatBoost + SHAP); acceptable for advisor workflows.
+
+---
+
+## ADR-003: Use All 12 OULAD Features Including Demographics
+
+**Date**: 2025-01-30 | **Revised**: 2025-04-16
+**Status**: ACTIVE (supersedes earlier behavioral-only draft)
+**Decision**: Train on all 12 OULAD features — 5 numeric + 7 native categoricals
+
+**Features**:
+- Numeric: `num_of_prev_attempts`, `studied_credits`, `avg_score`, `total_clicks`, `completion_rate`
+- Categorical: `code_module`, `gender`, `region`, `highest_education`, `imd_band`, `age_band`, `disability`
+
+**Reason**:
+- CatBoost handles categoricals natively — no manual encoding, no introduced bias from arbitrary encoding choices
+- Demographics are used as context signals (e.g. first-generation students, high deprivation), not as grounds for differential treatment
+- SHAP explains which features drive each prediction, enabling advisors to see if demographic factors appear unexpectedly influential
+- Recall on held-out test set: 0.9009 — capturing 90% of real at-risk students
+
+**Ethical Mitigation**:
+- SHAP factors are surfaced to advisors; any demographic dominance would be visible and challengeable
+- Final decision always remains with the human advisor — the model is an alert, not a verdict
+
+**Alternative Considered**:
+- Behavioral-only model (considered: marginally lower recall, dismissed because demographic context is meaningful and transparent with SHAP)
+
+**Related Files**: `notebooks/notebook.ipynb`, `models/catboost_baseline_production.pkl`
+
+---
+
+## ADR-004: Use CatBoost Baseline (Not Tuned, Not XGBoost)
+
+**Date**: 2025-01-31 | **Revised**: 2025-04-16
 **Status**: ACTIVE
-**Decision**: Process student data in batches (every 24hrs)
-**Reason**: Ethical - students need space to catch up
-**Impact**: Predictions not real-time
+**Decision**: CatBoost baseline model (`catboost_baseline_production.pkl`) as the production predictor
 
----
+**Model Comparison** (from `notebooks/notebook.ipynb`):
+| Model | AUC-ROC | Recall (at-risk) | Precision |
+|---|---|---|---|
+| CatBoost Baseline | 0.9780 | **0.9009** | 0.86 |
+| CatBoost Tuned | 0.9781 | 0.8983 | 0.87 |
+| Random Forest | ~0.96 | ~0.87 | — |
+| Logistic Regression | ~0.91 | ~0.83 | — |
 
-## ADR-003: Use Behavioral Features Only (No Demographics)
+**Why Baseline Over Tuned**:
+- Recall is the primary metric for dropout risk — missing a real at-risk student is worse than a false alarm
+- Baseline recall (0.9009) > Tuned recall (0.8983) — baseline catches more at-risk students
+- AUC-ROC difference is negligible (0.0001)
 
-**Date**: 2025-01-30  
-**Status**: ACTIVE  
-**Decision**: Train model on behavioral data only, exclude demographic features  
+**Why CatBoost**:
+- Native categorical handling — no one-hot encoding, no information loss
+- `cat_features` parameter passed directly as string values
+- Best recall across all tested models
+- SHAP-compatible via `TreeExplainer`
 
-**Breakthrough Finding**:
-- Behavioral-only model: 91.0% accuracy
-- Full model (with demographics): 91.2% accuracy
-- Difference: Only 0.2% accuracy loss!
+**Critical Implementation Note**:
+- Feature column order must match training exactly: `[code_module, gender, region, highest_education, imd_band, age_band, num_of_prev_attempts, studied_credits, disability, avg_score, total_clicks, completion_rate]`
+- `cat_feature_indices = [0,1,2,3,4,5,8]` — wrong column order causes `Invalid type for cat_feature` errors
 
-**Reason**: 
-- Prevents discrimination based on age, gender, disability, region
-- Ethical AI - model cannot learn demographic stereotypes
-- Fair predictions - all students judged on actions, not identity
-- Minimal accuracy tradeoff for massive ethical gain
-
-**Behavioral Features Used**:
-- total_clicks, avg_score, assessment_completion_rate
-- days_active, vle_engagement, studied_credits
-
-**Demographics Excluded**:
-- age_band, gender, disability, region, imd_band
-
-**Impact**: 
-- Model cannot discriminate against protected groups
-- 0.2% lower accuracy - acceptable tradeoff
-- More defensible to ethics review boards
-- Aligns with equity values
-
-**Alternative Considered**: 
-- Full feature set (rejected: ethical concerns outweigh 0.2% gain)
-
-**Related Files**: `data/processed/student_features_encoded.csv`
-
----
-
-## ADR-004: Use XGBoost (Not Logistic Regression or Random Forest)
-
-**Date**: 2025-01-31  
-**Status**: ACTIVE  
-**Decision**: XGBoost as primary prediction model  
-
-**Performance Comparison**:
-- XGBoost: 91% accuracy ⭐
-- Random Forest: 89% accuracy
-- Logistic Regression: 87% accuracy
-
-**Reason**: 
-- Best accuracy - outperforms alternatives by 2-4%
-- Handles imbalanced data well
-- Fast inference (<50ms per prediction)
-- Built-in feature importance
-- Industry standard for tabular data
-
-**Impact**: 
-- Model saved as .joblib files
-- Fast deployment-ready inference
-- Easy to explain to stakeholders
-
-**Alternative Considered**: 
-- Logistic Regression (rejected: 87% too low)
-- Random Forest (rejected: slower, 89% not enough gain)
-- Neural Networks (rejected: overkill for tabular data)
-
-**Related Files**: `models/xgboost_final.joblib`
+**Related Files**: `models/catboost_baseline_production.pkl`, `src/models/predictor.py`
 
 ---
 
@@ -150,7 +141,7 @@
 ## ADR-007: FastAPI for Backend (Not Flask/Django)
 
 **Date**: 2025-02-02  
-**Status**: IN PROGRESS  
+**Status**: COMPLETE  
 **Decision**: Use FastAPI for REST API backend  
 
 **Reason**: 
@@ -175,14 +166,14 @@
 - Flask (rejected: too basic, no async)
 - Django (rejected: too heavy, includes ORM we don't need)
 
-**Related Files**: `src/api/` (to be created)
+**Related Files**: `src/api/routes/`, `src/api/schemas/`, `src/api/main.py`
 
 ---
 
 ## ADR-008: React for Frontend (Not Vue/Angular)
 
 **Date**: 2025-02-02  
-**Status**: PLANNED  
+**Status**: COMPLETE  
 **Decision**: React + TypeScript for frontend dashboard  
 
 **Reason**: 
@@ -192,24 +183,25 @@
 - Good for portfolio showcase
 - TypeScript for type safety
 
-**Planned Components**:
-- StudentList - Filterable at-risk students table
-- StudentDetail - Individual risk profile
-- RiskChart - SHAP waterfall visualization
-- InterventionPanel - Recommended actions
-- Dashboard - Overview statistics
+**Delivered Components**:
+- `StudentTable` / `StudentModal` — filterable table with full OULAD profile modals
+- `RiskCircle` / `ShapFactors` — animated risk gauge + SHAP factor visualisation
+- `InterventionCard` — structured card with Action/Owner/Timeline/Success rendering
+- `PredictionForm` — manual 12-feature prediction form with categorical dropdowns
+- `ChatInterface` / `ChatTab` — full EduAssist conversational UI with student context sidebar
+- `DashboardPage` — cohort stats, risk distribution chart, high-risk alerts
 
 **Impact**: 
 - Requires Node.js, npm/yarn
-- Need to learn React hooks
-- Modern, professional UI
+- TypeScript + React Query + Zustand for type-safe, reactive UI
+- Dark/light mode with system preference detection
 
 **Alternative Considered**: 
 - Vue (rejected: less industry demand)
 - Angular (rejected: too complex)
 - Streamlit (rejected: not production-grade)
 
-**Related Files**: `frontend/` (to be created)
+**Related Files**: `frontend-react/src/`
 
 ---
 
@@ -253,7 +245,7 @@
 ## ADR-010: Hybrid Intervention System (Rules + LLM)
 
 **Date**: 2025-02-01  
-**Status**: DESIGNED (Not Implemented)  
+**Status**: COMPLETE  
 **Decision**: Combine rule-based policies with LLM enhancement  
 
 **Architecture**:
@@ -280,21 +272,21 @@
 - Rules only (rejected: less engaging)
 - LLM only (rejected: risk of hallucinations)
 
-**Related Files**: `src/agent/` (to be implemented)
+**Related Files**: `src/agent/rules.py`, `src/agent/hybrid.py`, `src/agent/prompts.py`, `src/agent/llm_client.py`
 
 ---
 
 ## ADR-011: Four-Week Timeline with Milestones
 
 **Date**: 2025-01-27  
-**Status**: ON TRACK  
+**Status**: COMPLETE  
 **Decision**: Structured 4-week sprint with clear deliverables  
 
 **Timeline**:
 - **Week 1**: Data + ML Core ✅ COMPLETE
-- **Week 2**: Backend API + Integration 🔄 IN PROGRESS
-- **Week 3**: Frontend Dashboard 📅 UPCOMING
-- **Week 4**: Testing + Demo Prep 📅 UPCOMING
+- **Week 2**: Backend API + Integration ✅ COMPLETE
+- **Week 3**: Frontend Dashboard ✅ COMPLETE
+- **Week 4**: Testing + Demo Prep ✅ COMPLETE — defence scheduled April 2025
 
 **Reason**: 
 - Academic deadline - project due Feb 24
@@ -339,5 +331,83 @@
 - Can explain decisions to stakeholders
 
 **Related**: All conversations with Claude as CTO
+
+---
+
+## ADR-013: SHAP Factors as First-Class Context for All AI Systems
+
+**Date**: 2025-04-16
+**Status**: ACTIVE
+**Decision**: Pass SHAP factors from the risk model into both the chat AI and the intervention generator
+
+**What changed**:
+- Chat endpoint: fetches SHAP factors after prediction and injects them as "Top Risk Drivers" in student context
+- Intervention endpoint: accepts `shap_factors` in the request body; hybrid engine passes them to both the rule engine (for priority boosting) and the LLM prompt (for targeted recommendations)
+- Frontend: `InterventionTab` reads `prediction.shap_factors` and includes them in the intervention API call
+
+**Reason**:
+- Without SHAP, the AI only knows raw metrics (avg_score, completion_rate, etc.) but not *which ones are actually driving risk for this specific student*
+- Two students can have the same avg_score but different top SHAP drivers — the interventions should differ accordingly
+- SHAP-aware interventions are more defensible: advisors can trace why a specific action was recommended back to the model's explanation
+
+**Rule engine impact**:
+- Top risk-increasing SHAP features boost the corresponding intervention priority (`medium → high`, `high → critical`)
+- Ensures the most impactful action gets surfaced first
+
+**LLM prompt impact**:
+- SHAP section added to `INTERVENTION_ENHANCEMENT_TEMPLATE` with direction (↑ raises / ↓ lowers) and percentage of model explanation
+- LLM instructed to "address the top SHAP drivers directly"
+
+**Related Files**: `src/api/routes/chat.py`, `src/agent/prompts.py`, `src/agent/rules.py`, `src/agent/hybrid.py`, `src/api/schemas/intervention.py`, `frontend-react/src/pages/InterventionTab.tsx`
+
+---
+
+## ADR-014: Context Injection Instead of RAG
+
+**Date**: 2025-04-16
+**Status**: ACTIVE
+**Decision**: Use direct prompt context injection for student data, not a RAG (Retrieval-Augmented Generation) pipeline
+
+**What we do**:
+- When a student is selected in the chat sidebar, the backend fetches their full record + runs prediction + fetches SHAP factors
+- All of this is injected as structured text into the LLM prompt for that message
+
+**Why not RAG**:
+- RAG requires a vector database (Chroma, Pinecone, pgvector) + embedding model + chunk retrieval pipeline
+- Our "knowledge base" is structured student records — these are better served by direct lookup than semantic search
+- RAG is most valuable for large unstructured document collections (papers, policies, manuals)
+- For this project scope and timeline, context injection provides equivalent quality with far less infrastructure
+
+**When RAG would make sense as a future upgrade**:
+- If we added a library of intervention research papers, course content, or institutional policies that advisors could query
+- At that point, semantic search over documents would outperform direct injection
+
+**Related Files**: `src/api/routes/chat.py`
+
+---
+
+## ADR-015: Student Names as First-Class Data
+
+**Date**: 2025-04-16
+**Status**: ACTIVE
+**Decision**: Store and display student names throughout the platform rather than IDs only
+
+**What changed**:
+- `data/sample_students.csv` includes a `name` column
+- All search inputs across Students, Prediction, Intervention, and Chat tabs accept name or student ID
+- Backend search (`loader.py`) performs OR-match on both `student_id` and `name` columns
+- AI chat context and intervention inputs use the student's name for personalized responses
+- UI displays name as primary identifier with student ID as subtitle
+
+**Reason**:
+- Advisors think of students by name, not by opaque IDs like "STU003"
+- Personalised AI responses that say "Emily's completion rate is 84%" are more useful than "Student STU001's completion rate is 84%"
+- Better UX for demo and defence scenarios
+
+**Impact**:
+- `name` column is optional — platform degrades gracefully to student_id if absent
+- No schema changes required; name is just another CSV column
+
+**Related Files**: `data/sample_students.csv`, `src/etl/loader.py`, `frontend-react/src/types/student.ts`
 
 ---

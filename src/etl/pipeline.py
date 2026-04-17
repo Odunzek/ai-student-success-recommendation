@@ -10,19 +10,21 @@ import pandas as pd
 from src.config import get_settings
 
 
-# Required features for the ML model
+# Required features for the ML model — matches catboost_baseline_production.pkl
+# 5 numeric + 7 raw string categoricals (no encoding needed)
 REQUIRED_FEATURES = [
     "num_of_prev_attempts",
     "studied_credits",
     "avg_score",
     "total_clicks",
     "completion_rate",
-    "module_BBB",
-    "module_CCC",
-    "module_DDD",
-    "module_EEE",
-    "module_FFF",
-    "module_GGG",
+    "code_module",
+    "gender",
+    "region",
+    "highest_education",
+    "imd_band",
+    "age_band",
+    "disability",
 ]
 
 # OULAD file names expected in ZIP
@@ -34,14 +36,14 @@ OULAD_FILES = [
 ]
 
 
-def detect_format(df: pd.DataFrame) -> Literal["processed", "combined_raw", "unknown"]:
+def detect_format(df: pd.DataFrame) -> Literal["processed", "combined_raw", "portuguese", "unknown"]:
     """Auto-detect if data is pre-processed or raw OULAD format.
 
     Args:
         df: Input DataFrame to analyze
 
     Returns:
-        Format type: "processed", "combined_raw", or "unknown"
+        Format type: "processed", "combined_raw", "portuguese", or "unknown"
     """
     columns = set(df.columns)
 
@@ -55,11 +57,85 @@ def detect_format(df: pd.DataFrame) -> Literal["processed", "combined_raw", "unk
     if raw_indicators.issubset(columns) or "id_student" in columns:
         return "combined_raw"
 
+    # Check for Portuguese/UCI Student Performance dataset format
+    portuguese_indicators = {"g1", "g2", "g3", "failures", "absences", "study_time"}
+    if portuguese_indicators.issubset(columns):
+        return "portuguese"
+
     return "unknown"
 
 
+def transform_portuguese(df: pd.DataFrame) -> pd.DataFrame:
+    """Transform UCI Portuguese student performance dataset into model features.
+
+    Maps columns from the UCI Student Performance dataset to OULAD model features:
+    - avg_score: mean of g1, g2, g3 (converted from 0-20 → 0-100 scale)
+    - completion_rate: derived from absences (fewer absences = higher rate)
+    - num_of_prev_attempts: mapped from failures
+    - total_clicks: estimated from study_time (1-4 scale → engagement proxy)
+    - studied_credits: fixed default of 60 (no equivalent column)
+    - module_*: all 0 (no module info in this dataset)
+
+    Args:
+        df: Raw Portuguese student DataFrame
+
+    Returns:
+        Transformed DataFrame with required OULAD features
+    """
+    result = pd.DataFrame()
+
+    # Student ID
+    if "student_id" in df.columns:
+        result["student_id"] = df["student_id"]
+    else:
+        result["student_id"] = df.index.astype(str)
+
+    # avg_score: mean of g1, g2, g3 on 0-20 scale → convert to 0-100
+    grade_cols = [c for c in ["g1", "g2", "g3"] if c in df.columns]
+    if grade_cols:
+        result["avg_score"] = df[grade_cols].mean(axis=1) * 5  # 0-20 → 0-100
+    else:
+        result["avg_score"] = 50.0
+    result["avg_score"] = result["avg_score"].fillna(50.0).clip(0, 100)
+
+    # completion_rate: inverse of absences (0 absences = 1.0, 30+ = 0.0)
+    if "absences" in df.columns:
+        result["completion_rate"] = (1 - (df["absences"].clip(0, 30) / 30)).round(3)
+    else:
+        result["completion_rate"] = 0.8
+    result["completion_rate"] = result["completion_rate"].fillna(0.8).clip(0, 1)
+
+    # num_of_prev_attempts: mapped from failures
+    if "failures" in df.columns:
+        result["num_of_prev_attempts"] = df["failures"].fillna(0).astype(int)
+    else:
+        result["num_of_prev_attempts"] = 0
+
+    # total_clicks: study_time is 1-4 scale; multiply to create reasonable engagement proxy
+    # study_time 1 (~2h/week) → ~400 clicks, 4 (>10h/week) → ~2000 clicks
+    if "study_time" in df.columns:
+        result["total_clicks"] = (df["study_time"].fillna(2) * 500).astype(int)
+    else:
+        result["total_clicks"] = 1000
+
+    # studied_credits: no equivalent — use standard default
+    result["studied_credits"] = 60
+
+    # Categorical features: not available in the Portuguese dataset
+    # 'Unknown' is a valid CatBoost category — treated as its own group
+    result["code_module"]        = "Unknown"
+    result["gender"]             = "Unknown"
+    result["region"]             = "Unknown"
+    result["highest_education"]  = "Unknown"
+    result["imd_band"]           = "Unknown"
+    result["age_band"]           = "Unknown"
+    result["disability"]         = "Unknown"
+
+    return result
+
+
 def validate_features(df: pd.DataFrame) -> tuple[bool, list[str]]:
-    """Ensure output DataFrame has all required 11 features.
+    """Ensure output DataFrame has all required 12 features.
 
     Args:
         df: DataFrame to validate
@@ -187,19 +263,21 @@ def transform_oulad(dfs: dict[str, pd.DataFrame]) -> pd.DataFrame:
 
     result["completion_rate"] = result["completion_rate"].fillna(0.5)
 
-    # One-hot encode code_module
-    if "code_module" in student_info.columns:
-        module_info = student_info[["id_student", "code_module"]].copy()
-        result = result.merge(module_info, on="id_student", how="left")
+    # Categorical features — kept as raw strings for CatBoost native handling
+    # Pull each column from studentInfo if present, otherwise default to 'Unknown'
+    cat_cols = ["code_module", "gender", "region", "highest_education",
+                "imd_band", "age_band", "disability"]
 
-        for module in ["BBB", "CCC", "DDD", "EEE", "FFF", "GGG"]:
-            result[f"module_{module}"] = (result["code_module"] == module).astype(int)
+    available_cats = [c for c in cat_cols if c in student_info.columns]
+    if available_cats:
+        cat_info = student_info[["id_student"] + available_cats].copy()
+        result = result.merge(cat_info, on="id_student", how="left")
 
-        result = result.drop(columns=["code_module"], errors="ignore")
-    else:
-        # Default all modules to 0
-        for module in ["BBB", "CCC", "DDD", "EEE", "FFF", "GGG"]:
-            result[f"module_{module}"] = 0
+    for col in cat_cols:
+        if col not in result.columns:
+            result[col] = "Unknown"
+        else:
+            result[col] = result[col].fillna("Unknown").astype(str)
 
     # Drop id_student for model input (or rename to student_id)
     result = result.rename(columns={"id_student": "student_id"})
@@ -297,23 +375,22 @@ def transform_combined(df: pd.DataFrame) -> pd.DataFrame:
         else:
             result["completion_rate"] = 0.5
 
-        # One-hot encode code_module
-        if "code_module" in df.columns:
-            module_per_student = grouped["code_module"].first().reset_index()
-            module_per_student.columns = ["id_student", "code_module"]
-            result = result.merge(
-                module_per_student.rename(columns={"id_student": "student_id"}),
-                on="student_id",
-                how="left"
-            )
+        # Categorical features — kept as raw strings for CatBoost native handling
+        cat_cols = ["code_module", "gender", "region", "highest_education",
+                    "imd_band", "age_band", "disability"]
 
-            for module in ["BBB", "CCC", "DDD", "EEE", "FFF", "GGG"]:
-                result[f"module_{module}"] = (result["code_module"] == module).astype(int)
-
-            result = result.drop(columns=["code_module"], errors="ignore")
-        else:
-            for module in ["BBB", "CCC", "DDD", "EEE", "FFF", "GGG"]:
-                result[f"module_{module}"] = 0
+        for col in cat_cols:
+            if col in df.columns:
+                cat_per_student = grouped[col].first().reset_index()
+                cat_per_student.columns = ["id_student", col]
+                result = result.merge(
+                    cat_per_student.rename(columns={"id_student": "student_id"}),
+                    on="student_id",
+                    how="left"
+                )
+                result[col] = result[col].fillna("Unknown").astype(str)
+            else:
+                result[col] = "Unknown"
     else:
         # No id_student column - use row index
         result["num_of_prev_attempts"] = df.get("num_of_prev_attempts", 0)
@@ -322,11 +399,10 @@ def transform_combined(df: pd.DataFrame) -> pd.DataFrame:
         result["total_clicks"] = df.get("total_clicks", df.get("sum_click", 0))
         result["completion_rate"] = df.get("completion_rate", 0.5)
 
-        for module in ["BBB", "CCC", "DDD", "EEE", "FFF", "GGG"]:
-            if f"module_{module}" in df.columns:
-                result[f"module_{module}"] = df[f"module_{module}"]
-            else:
-                result[f"module_{module}"] = 0
+        cat_cols = ["code_module", "gender", "region", "highest_education",
+                    "imd_band", "age_band", "disability"]
+        for col in cat_cols:
+            result[col] = str(df.get(col, "Unknown") or "Unknown")
 
     # Fill NaN values
     result["num_of_prev_attempts"] = result["num_of_prev_attempts"].fillna(0).astype(int)
@@ -398,15 +474,30 @@ def process_uploaded_file(
     detected = detect_format(df)
 
     if detected == "processed":
-        # Already has required features
+        # Already has required features — still fill any NaN rows
         if "student_id" not in df.columns:
             df["student_id"] = df.index.astype(str)
+        nan_fills = {
+            "avg_score": 50.0,
+            "completion_rate": 0.5,
+            "total_clicks": 0,
+            "num_of_prev_attempts": 0,
+            "studied_credits": 60,
+        }
+        for col, fill_val in nan_fills.items():
+            if col in df.columns:
+                df[col] = df[col].fillna(fill_val)
         return df, "processed"
 
     elif detected == "combined_raw":
         # Transform combined raw data
         df = transform_combined(df)
         return df, "combined_raw"
+
+    elif detected == "portuguese":
+        # Transform UCI Portuguese student performance dataset
+        df = transform_portuguese(df)
+        return df, "portuguese"
 
     else:
         # Unknown format - try to use as-is with defaults
@@ -428,6 +519,18 @@ def process_uploaded_file(
                     df[feat] = 50.0
                 else:
                     df[feat] = 0
+
+        # Fill NaN in feature columns that already exist (don't just add missing ones)
+        nan_fills = {
+            "avg_score": 50.0,
+            "completion_rate": 0.5,
+            "total_clicks": 0,
+            "num_of_prev_attempts": 0,
+            "studied_credits": 60,
+        }
+        for col, fill_val in nan_fills.items():
+            if col in df.columns:
+                df[col] = df[col].fillna(fill_val)
 
         # Return format string with info about defaults
         if defaulted_columns:

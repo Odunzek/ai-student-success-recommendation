@@ -21,6 +21,7 @@
  */
 
 import { useState, useEffect, useMemo } from 'react'
+import { useAppStore } from '../store/useAppStore'
 import { Sparkles, AlertTriangle, RefreshCw, UserCircle, Search, X } from 'lucide-react'
 import { ChatInterface } from '../components/chat/ChatInterface'
 import { Card, CardHeader, CardTitle } from '../components/ui/Card'
@@ -51,32 +52,19 @@ export function ChatTab() {
   // STATE
   // ---------------------------------------------------------------------------
 
-  /**
-   * Local message state - stores all messages for the current session.
-   * Note: Messages are stored locally (not fetched from server on reload)
-   * to keep the UI responsive. The server maintains the authoritative history.
-   */
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  // Persistent state (survives tab switches via Zustand)
+  const {
+    chatMessages: messages,
+    setChatMessages: setMessages,
+    chatSessionId: sessionId,
+    setChatSessionId: setSessionId,
+    chatSelectedStudentId: selectedStudentId,
+    setChatSelectedStudentId: setSelectedStudentId,
+    chatStudentSearchQuery: studentSearchQuery,
+    setChatStudentSearchQuery: setStudentSearchQuery,
+  } = useAppStore()
 
-  /**
-   * Session ID state with localStorage initialization.
-   * - On first render, attempts to restore session from localStorage
-   * - Updated when server returns a new session ID
-   * - Cleared on "New Conversation"
-   */
-  const [sessionId, setSessionId] = useState<string | null>(() => {
-    // Try to restore session from localStorage on initial render
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem(SESSION_STORAGE_KEY)
-    }
-    return null
-  })
-
-  /**
-   * Student context state for data-aware chat
-   */
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
-  const [studentSearchQuery, setStudentSearchQuery] = useState('')
+  // UI-only local state (no need to persist)
   const [showStudentDropdown, setShowStudentDropdown] = useState(false)
 
   // ---------------------------------------------------------------------------
@@ -125,8 +113,9 @@ export function ChatTab() {
     const query = debouncedSearchQuery.toLowerCase()
     return studentsData.students
       .filter((s) => {
-        const id = s.student_id ?? ''
-        return id.toString().toLowerCase().includes(query)
+        const id = (s.student_id ?? '').toLowerCase()
+        const name = (s.name ?? '').toLowerCase()
+        return id.includes(query) || name.includes(query)
       })
       .slice(0, 8)
   }, [studentsData?.students, debouncedSearchQuery])
@@ -152,6 +141,17 @@ export function ChatTab() {
       localStorage.setItem(SESSION_STORAGE_KEY, sessionId)
     }
   }, [sessionId])
+
+  /**
+   * Ensure the chat tab starts at the top when opened.
+   * This prevents the page from staying scrolled to the middle/bottom
+   * when navigating from other tabs.
+   */
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'auto' })
+    }
+  }, [])
 
   // ---------------------------------------------------------------------------
   // EVENT HANDLERS
@@ -179,7 +179,7 @@ export function ChatTab() {
     }
 
     // Add to UI immediately for responsiveness
-    setMessages((prev) => [...prev, userMessage])
+    setMessages([...messages, userMessage])
 
     try {
       // Send to server with session ID and optional student context
@@ -203,7 +203,8 @@ export function ChatTab() {
         flagged: response.flagged, // Mark if input was flagged as suspicious
       }
 
-      setMessages((prev) => [...prev, assistantMessage])
+      // Read current messages from store (not closure) to avoid stale state after async
+      setMessages([...useAppStore.getState().chatMessages, assistantMessage])
     } catch (error) {
       // On error, show a friendly error message in the chat
       const errorMessage: ChatMessage = {
@@ -212,7 +213,7 @@ export function ChatTab() {
         content: 'Sorry, I encountered an error. Please try again.',
         timestamp: new Date(),
       }
-      setMessages((prev) => [...prev, errorMessage])
+      setMessages([...useAppStore.getState().chatMessages, errorMessage])
     }
   }
 
@@ -299,7 +300,7 @@ export function ChatTab() {
                   }}
                   onFocus={() => studentSearchQuery && setShowStudentDropdown(true)}
                   onBlur={() => setTimeout(() => setShowStudentDropdown(false), 200)}
-                  placeholder="Search by student ID..."
+                  placeholder="Search by name or student ID..."
                   className="w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-white placeholder:text-surface-400 dark:placeholder:text-surface-500 px-3 py-2 text-sm pr-8 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 />
                 <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-400" />
@@ -314,12 +315,15 @@ export function ChatTab() {
                       type="button"
                       onClick={() => {
                         setSelectedStudentId(student.student_id)
-                        setStudentSearchQuery(student.student_id)
+                        setStudentSearchQuery(student.name ?? student.student_id)
                         setShowStudentDropdown(false)
                       }}
                       className="w-full px-3 py-2 text-left text-sm text-surface-900 dark:text-white hover:bg-surface-50 dark:hover:bg-surface-800 focus:bg-surface-50 dark:focus:bg-surface-800 focus:outline-none"
                     >
-                      {student.student_id}
+                      <span className="font-medium">{student.name ?? student.student_id}</span>
+                      {student.name && (
+                        <span className="ml-2 text-surface-400 dark:text-surface-500 text-xs">{student.student_id}</span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -331,7 +335,14 @@ export function ChatTab() {
               <div className="flex items-center justify-between p-2 bg-primary/10 rounded-lg">
                 <div className="flex items-center gap-2">
                   <UserCircle className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium text-primary">{selectedStudent.student_id}</span>
+                  <div>
+                    <span className="text-sm font-medium text-primary">
+                      {selectedStudent.name ?? selectedStudent.student_id}
+                    </span>
+                    {selectedStudent.name && (
+                      <span className="block text-xs text-primary/70">{selectedStudent.student_id}</span>
+                    )}
+                  </div>
                 </div>
                 <button
                   onClick={() => {

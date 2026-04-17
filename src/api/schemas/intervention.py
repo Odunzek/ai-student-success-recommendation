@@ -43,6 +43,10 @@ class InterventionRequest(BaseModel):
     # Optional context for LLM personalization
     student_name: str | None = Field(None, description="Student name for personalization")
     module_name: str | None = Field(None, description="Module name for context")
+    shap_factors: list[dict] | None = Field(
+        None,
+        description="Top SHAP factors from the risk model — tells the LLM which features are actually driving risk"
+    )
 
     # Control flag
     use_llm: bool = Field(

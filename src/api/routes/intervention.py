@@ -41,6 +41,7 @@ async def generate_intervention(request: InterventionRequest) -> InterventionRes
                 num_of_prev_attempts=request.num_of_prev_attempts,
                 student_name=request.student_name,
                 module_name=request.module_name,
+                shap_factors=request.shap_factors,
             )
         else:
             # Rules only
@@ -52,6 +53,7 @@ async def generate_intervention(request: InterventionRequest) -> InterventionRes
                 total_clicks=request.total_clicks,
                 studied_credits=request.studied_credits,
                 num_of_prev_attempts=request.num_of_prev_attempts,
+                shap_factors=request.shap_factors,
             )
 
         # Convert interventions to proper schema

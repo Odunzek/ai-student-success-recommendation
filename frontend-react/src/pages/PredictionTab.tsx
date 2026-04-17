@@ -2,6 +2,7 @@ import { Users, AlertTriangle, TrendingDown, Activity } from 'lucide-react'
 import { StatCard } from '../components/dashboard/StatCard'
 import { RiskDistribution } from '../components/prediction/RiskDistribution'
 import { StudentLookup } from '../components/prediction/StudentLookup'
+import { PredictionForm } from '../components/prediction/PredictionForm'
 import { useDashboardStats } from '../api/hooks/useDashboard'
 import { formatPercentage } from '../lib/utils'
 
@@ -38,14 +39,14 @@ export function PredictionTab() {
         />
       </div>
 
-      {/* Two Column Layout */}
+      {/* Two Column Layout — Lookup + Distribution */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left: Risk Distribution */}
         <RiskDistribution stats={stats} />
-
-        {/* Right: Student Lookup */}
         <StudentLookup />
       </div>
+
+      {/* Manual Prediction Form */}
+      <PredictionForm />
     </div>
   )
 }

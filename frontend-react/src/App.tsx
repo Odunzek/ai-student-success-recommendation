@@ -7,6 +7,7 @@ import { InterventionTab } from './pages/InterventionTab'
 import { StudentsTab } from './pages/StudentsTab'
 import { DataTab } from './pages/DataTab'
 import { ChatTab } from './pages/ChatTab'
+import { HelpPage } from './pages/HelpPage'
 import { ToastProvider } from './components/ui/Toast'
 import { useAppStore, type NavRoute } from './store/useAppStore'
 import { useThemeStore } from './store/useThemeStore'
@@ -19,6 +20,7 @@ const routes: Record<NavRoute, React.ComponentType> = {
   'interventions': InterventionTab,
   'chat': ChatTab,
   'data': DataTab,
+  'help': HelpPage,
 }
 
 function App() {

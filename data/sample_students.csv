@@ -1,0 +1,16 @@
+student_id,name,num_of_prev_attempts,studied_credits,avg_score,total_clicks,completion_rate,code_module,gender,region,highest_education,imd_band,age_band,disability
+STU001,Emily Clarke,0,60,82.0,1850,0.92,BBB,F,Scotland,HE Qualification,80-90%,35-55,N
+STU002,Sarah MacDonald,0,60,66.4,1435,0.83,BBB,F,Scotland,HE Qualification,20-30%,35-55,N
+STU003,Jake Thompson,1,60,18.5,210,0.17,CCC,M,South East Region,Lower Than A Level,10-20%,0-35,N
+STU004,Priya Sharma,0,120,91.0,3200,0.98,DDD,F,London Region,Post Graduate Qualification,90-100%,35-55,N
+STU005,Lee Morrison,2,60,31.2,95,0.08,EEE,M,North Western Region,No Formal quals,0-10%,0-35,Y
+STU006,Amy Pearson,0,60,75.5,1100,0.75,BBB,F,West Midlands Region,A Level or Equivalent,50-60%,0-35,N
+STU007,David Hughes,3,30,22.0,50,0.00,FFF,M,Wales,Lower Than A Level,10-20%,35-55,N
+STU008,Charlotte Evans,0,90,88.3,2650,0.95,GGG,F,South East Region,HE Qualification,70-80%,35-55,N
+STU009,Ryan Patel,1,60,45.0,380,0.42,CCC,M,East Midlands Region,A Level or Equivalent,30-40%,0-35,N
+STU010,Margaret Wilson,0,60,71.2,990,0.67,DDD,F,Yorkshire Region,HE Qualification,60-70%,55<=,Y
+STU011,James O'Brien,0,120,94.5,4100,1.00,AAA,M,London Region,Post Graduate Qualification,90-100%,35-55,N
+STU012,Tyler Grant,2,60,28.7,120,0.08,BBB,M,North Region,No Formal quals,0-10%,0-35,Y
+STU013,Siobhan Murphy,0,60,79.8,1560,0.88,EEE,F,Ireland,HE Qualification,70-80%,35-55,N
+STU014,Ben Carter,1,60,39.5,270,0.25,GGG,M,South West Region,Lower Than A Level,20-30%,0-35,N
+STU015,Zoe Hartley,0,60,58.0,750,0.58,CCC,F,East Anglian Region,A Level or Equivalent,50-60%,0-35,N

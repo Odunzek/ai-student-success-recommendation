@@ -21,7 +21,7 @@ router = APIRouter(prefix="/students", tags=["Students"])
 async def list_students(
     page: int = Query(default=1, ge=1, description="Page number"),
     per_page: int = Query(default=20, ge=1, le=100, description="Items per page"),
-    search: str = Query(default=None, description="Search by student ID"),
+    search: str = Query(default=None, description="Search by student ID or name"),
     risk_level: str = Query(default=None, description="Filter by risk level (low, medium, high)"),
 ):
     """Get paginated list of students with optional filtering.
@@ -55,14 +55,25 @@ async def list_students(
 
     total_pages = (total + per_page - 1) // per_page if total > 0 else 1
 
-    # Add student_id field if not present and format for frontend
+    predictor = get_predictor()
+
+    # Add student_id, id, and dropout_risk fields for the frontend
     formatted_students = []
     for i, student in enumerate(students):
         student_data = dict(student)
         if "student_id" not in student_data:
             student_data["student_id"] = f"STU{offset + i + 1:04d}"
         if "id" not in student_data:
-            student_data["id"] = offset + i + 1
+            student_data["id"] = offset + i
+
+        # Compute dropout_risk probability for the risk badge in the table
+        if predictor.is_loaded and "dropout_risk" not in student_data:
+            try:
+                result = predictor.predict(student_data)
+                student_data["dropout_risk"] = result["risk_probability"]
+            except Exception:
+                pass  # Leave dropout_risk absent — frontend shows N/A gracefully
+
         formatted_students.append(student_data)
 
     return {
@@ -147,19 +158,34 @@ async def predict_student_risk(student_id: str):
     try:
         settings = get_settings()
 
-        # Extract features from student data
+        def safe_int(val, default=0):
+            try:
+                v = float(val)
+                return default if v != v else int(v)  # NaN != NaN
+            except (TypeError, ValueError):
+                return default
+
+        def safe_float(val, default=0.0):
+            try:
+                v = float(val)
+                return default if v != v else v  # NaN != NaN
+            except (TypeError, ValueError):
+                return default
+
+        # Extract features from student data — 12-feature CatBoost contract
         feature_data = {
-            "num_of_prev_attempts": int(student.get("num_of_prev_attempts", 0)),
-            "studied_credits": int(student.get("studied_credits", 60)),
-            "avg_score": float(student.get("avg_score", 50)),
-            "total_clicks": int(student.get("total_clicks", 0)),
-            "completion_rate": float(student.get("completion_rate", 0.5)),
-            "module_BBB": int(student.get("module_BBB", 0)),
-            "module_CCC": int(student.get("module_CCC", 0)),
-            "module_DDD": int(student.get("module_DDD", 0)),
-            "module_EEE": int(student.get("module_EEE", 0)),
-            "module_FFF": int(student.get("module_FFF", 0)),
-            "module_GGG": int(student.get("module_GGG", 0)),
+            "num_of_prev_attempts": safe_int(student.get("num_of_prev_attempts"), 0),
+            "studied_credits": safe_int(student.get("studied_credits"), 60),
+            "avg_score": safe_float(student.get("avg_score"), 50.0),
+            "total_clicks": safe_int(student.get("total_clicks"), 0),
+            "completion_rate": safe_float(student.get("completion_rate"), 0.5),
+            "code_module": str(student.get("code_module") or "Unknown"),
+            "gender": str(student.get("gender") or "Unknown"),
+            "region": str(student.get("region") or "Unknown"),
+            "highest_education": str(student.get("highest_education") or "Unknown"),
+            "imd_band": str(student.get("imd_band") or "Unknown"),
+            "age_band": str(student.get("age_band") or "Unknown"),
+            "disability": str(student.get("disability") or "Unknown"),
         }
 
         result = predictor.predict(feature_data)
@@ -174,16 +200,12 @@ async def predict_student_risk(student_id: str):
 
         if explainer.is_loaded:
             try:
-                # Prepare features array for SHAP
-                numeric_features = settings.numeric_features
-                module_features = settings.module_features
-
-                numeric_values = [float(feature_data.get(f, 0)) for f in numeric_features]
-                module_values = [int(feature_data.get(f, 0)) for f in module_features]
-                features_array = np.array(numeric_values + module_values).reshape(1, -1)
+                # Use predictor._prepare_features() to build the correct DataFrame
+                # (same function used during prediction — guarantees feature order matches)
+                features_df = predictor._prepare_features(feature_data)
 
                 # Get real SHAP explanations
-                top_factors = explainer.explain(features_array)
+                top_factors = explainer.explain(features_df)
 
                 # Calculate total absolute SHAP to normalize to percentages
                 total_abs_shap = sum(abs(f["impact"]) for f in top_factors)

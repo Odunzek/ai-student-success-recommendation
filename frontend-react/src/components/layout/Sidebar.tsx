@@ -11,6 +11,7 @@ import {
   LogOut,
   Sun,
   Moon,
+  HelpCircle,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useEffect } from 'react'
@@ -25,7 +26,8 @@ const navItems = [
   { route: 'students' as NavRoute, label: 'Student Management', icon: Users },
   { route: 'interventions' as NavRoute, label: 'Interventions', icon: Lightbulb },
   { route: 'chat' as NavRoute, label: 'AI Chat Interface', icon: MessageSquare },
-  { route: 'data' as NavRoute, label: 'Data Upload', icon: Database },
+  { route: 'data' as NavRoute, label: 'Data Upload',         icon: Database },
+  { route: 'help' as NavRoute, label: 'Help & Documentation', icon: HelpCircle },
 ]
 
 export function Sidebar() {
@@ -107,8 +109,8 @@ export function Sidebar() {
                 key={item.route}
                 onClick={() => handleNavClick(item.route)}
                 className={cn(
-                  'relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl',
-                  'text-sm font-medium transition-colors duration-200',
+                  'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl',
+                  'text-sm font-medium transition-all duration-200',
                   'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
                   isActive
                     ? 'text-white bg-primary-600/15'
@@ -120,15 +122,6 @@ export function Sidebar() {
                 whileTap={{ scale: 0.98 }}
                 aria-current={isActive ? 'page' : undefined}
               >
-                {/* Active indicator bar */}
-                {isActive && (
-                  <motion.div
-                    layoutId="activeSidebarIndicator"
-                    className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r-full bg-primary-500"
-                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                  />
-                )}
-
                 <Icon className={cn('h-5 w-5 flex-shrink-0', !showLabel && 'mx-auto')} />
 
                 <AnimatePresence>

@@ -24,9 +24,26 @@ class ShapExplainer:
         self._initialized = True
         self.explainer = None
         self.settings = get_settings()
-        self.feature_names = (
-            self.settings.numeric_features + self.settings.module_features
-        )
+        # Feature names MUST match the exact column order used during training.
+        # The model was trained with categoricals first (positions 0-5, 8),
+        # NOT in numeric-first order. Mismatching this causes SHAP values to be
+        # labelled with the wrong feature names.
+        # This order is confirmed by cat_feature_indices=[0,1,2,3,4,5,8]
+        # from the training notebook output.
+        self.feature_names = [
+            "code_module",          # 0  — categorical
+            "gender",               # 1  — categorical
+            "region",               # 2  — categorical
+            "highest_education",    # 3  — categorical
+            "imd_band",             # 4  — categorical
+            "age_band",             # 5  — categorical
+            "num_of_prev_attempts", # 6  — numeric
+            "studied_credits",      # 7  — numeric
+            "disability",           # 8  — categorical
+            "avg_score",            # 9  — numeric
+            "total_clicks",         # 10 — numeric
+            "completion_rate",      # 11 — numeric
+        ]
 
     def load(self) -> None:
         """Initialize the SHAP explainer with the model."""
@@ -34,7 +51,7 @@ class ShapExplainer:
         if not predictor.is_loaded:
             raise RuntimeError("Predictor must be loaded before explainer")
 
-        # Create TreeExplainer for XGBoost
+        # Create TreeExplainer for CatBoost
         self.explainer = shap.TreeExplainer(predictor.model)
 
     def explain(self, features: np.ndarray) -> list[dict]:

@@ -4,7 +4,7 @@ import re
 
 from src.config import get_settings
 from src.agent.rules import RuleEngine, get_rule_engine
-from src.agent.llm_client import OpenAIClient, OllamaClient, get_llm_client
+from src.agent.llm_client import OpenAIClient, get_llm_client
 from src.agent.prompts import SYSTEM_PROMPT, create_intervention_prompt
 
 
@@ -20,7 +20,7 @@ class HybridEngine:
     def __init__(
         self,
         rule_engine: RuleEngine | None = None,
-        llm_client: OpenAIClient | OllamaClient | None = None,
+        llm_client: OpenAIClient | None = None,
     ):
         self.rule_engine = rule_engine or get_rule_engine()
         self.llm_client = llm_client or get_llm_client()
@@ -36,6 +36,7 @@ class HybridEngine:
         num_of_prev_attempts: int = 0,
         student_name: str | None = None,
         module_name: str | None = None,
+        shap_factors: list[dict] | None = None,
     ) -> dict:
         """Generate interventions using hybrid approach.
 
@@ -63,6 +64,7 @@ class HybridEngine:
             total_clicks=total_clicks,
             studied_credits=studied_credits,
             num_of_prev_attempts=num_of_prev_attempts,
+            shap_factors=shap_factors,
         )
 
         # Check if LLM is enabled and available
@@ -88,6 +90,7 @@ class HybridEngine:
                 interventions=rule_result["interventions"],
                 student_name=student_name,
                 module_name=module_name,
+                shap_factors=shap_factors,
             )
 
             # Get LLM response

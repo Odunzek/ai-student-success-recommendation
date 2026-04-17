@@ -48,6 +48,7 @@ from src.agent.prompts import (
 from src.services.chat_store import get_chat_store
 from src.etl.loader import get_data_loader
 from src.models.predictor import get_predictor
+from src.models.explainer import get_explainer
 
 # Configure logger for this module
 logger = logging.getLogger(__name__)
@@ -141,25 +142,50 @@ async def chat(request: ChatRequest) -> ChatResponse:
             student = loader.get_student(request.student_id)
             if student:
                 # Get prediction for the student
-                risk_score = None
+                risk_probability = None
                 risk_level = None
+                shap_context = ""
                 try:
                     if predictor.is_loaded:
                         prediction = predictor.predict(student)
-                        risk_score = prediction.get("dropout_probability")
+                        risk_probability = prediction.get("risk_probability")   # correct key
                         risk_level = prediction.get("risk_level", "unknown")
+
+                        # Get SHAP factors so the AI understands WHY the student is at risk
+                        explainer = get_explainer()
+                        if explainer.is_loaded:
+                            features_df = predictor._prepare_features(student)
+                            shap_factors = explainer.explain(features_df)
+                            total_abs = sum(abs(f["impact"]) for f in shap_factors)
+                            lines = []
+                            for f in shap_factors[:4]:
+                                pct = round(abs(f["impact"]) / total_abs * 100) if total_abs > 0 else 0
+                                arrow = "↑ raises risk" if f["impact"] > 0 else "↓ lowers risk"
+                                lines.append(f"  • {f['feature']}: {arrow} ({pct}% of model explanation)")
+                            shap_context = "\n- Top Risk Drivers (model explanation):\n" + "\n".join(lines)
                 except Exception as e:
                     logger.warning(f"Failed to get prediction for student {request.student_id}: {e}")
 
-                # Build comprehensive student context
+                # Build comprehensive student context including demographics and SHAP
+                student_name = student.get('name') or request.student_id
+                disability = student.get('disability', 'N/A')
+                disability_display = 'Yes' if disability == 'Y' else 'No' if disability == 'N' else disability
                 student_context = f"""
-## STUDENT DATA (ID: {request.student_id})
-- Risk Score: {f'{risk_score:.0%}' if risk_score else 'Not calculated'} ({risk_level or 'unknown'} risk)
-- Completion Rate: {student.get('completion_rate', 'N/A')}
-- Average Score: {student.get('avg_score', 'N/A')}
+## STUDENT DATA
+- Name: {student_name} (ID: {request.student_id})
+- Risk Score: {f'{risk_probability:.0%}' if risk_probability is not None else 'Not calculated'} ({risk_level or 'unknown'} risk)
+- Completion Rate: {f"{student.get('completion_rate', 0):.0%}" if student.get('completion_rate') is not None else 'N/A'}
+- Average Assessment Score: {student.get('avg_score', 'N/A')}/100
 - VLE Engagement: {student.get('total_clicks', 'N/A')} clicks
 - Credits Studied: {student.get('studied_credits', 'N/A')}
 - Previous Attempts: {student.get('num_of_prev_attempts', 'N/A')}
+- Module: {student.get('code_module', 'N/A')}
+- Education Level: {student.get('highest_education', 'N/A')}
+- Age Band: {student.get('age_band', 'N/A')}
+- Gender: {student.get('gender', 'N/A')}
+- Region: {student.get('region', 'N/A')}
+- IMD Band (deprivation): {student.get('imd_band', 'N/A')}
+- Disability: {disability_display}{shap_context}
 """
             else:
                 student_context = f"\n[Note: Student ID {request.student_id} not found in uploaded data]\n"
@@ -202,7 +228,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
     # STEP 5: BUILD PROMPT WITH CONVERSATION CONTEXT
     # Include recent messages for multi-turn conversation coherence
     # -------------------------------------------------------------------------
-    conversation_history = chat_store.get_conversation_context(session_id, max_messages=6)
+    conversation_history = chat_store.get_conversation_context(session_id, max_messages=10)
 
     # Create the prompt using the appropriate template
     # Use full_context which includes student data if available

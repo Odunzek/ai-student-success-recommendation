@@ -1,9 +1,10 @@
 /**
- * API base URL - Vite proxy handles the /api -> /api/v1 transformation
- * See vite.config.ts for proxy configuration
- * Backend uses /api/v1 prefix (defined in src/config.py)
+ * API base URL.
+ * - Development: Vite proxy rewrites /api → /api/v1 (see vite.config.ts)
+ * - Production: set VITE_API_URL to your backend URL, e.g.
+ *   VITE_API_URL=https://your-backend.railway.app/api/v1
  */
-const API_BASE = '/api'
+const API_BASE = import.meta.env.VITE_API_URL || '/api'
 
 export class ApiError extends Error {
   constructor(

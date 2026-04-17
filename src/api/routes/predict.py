@@ -135,12 +135,13 @@ async def batch_predict():
                     avg_score=float(student.get("avg_score", 50)),
                     total_clicks=int(student.get("total_clicks", 0)),
                     completion_rate=float(student.get("completion_rate", 0.5)),
-                    module_BBB=False,
-                    module_CCC=False,
-                    module_DDD=False,
-                    module_EEE=False,
-                    module_FFF=False,
-                    module_GGG=False,
+                    code_module=str(student.get("code_module", "Unknown")),
+                    gender=str(student.get("gender", "Unknown")),
+                    region=str(student.get("region", "Unknown")),
+                    highest_education=str(student.get("highest_education", "Unknown")),
+                    imd_band=str(student.get("imd_band", "Unknown")),
+                    age_band=str(student.get("age_band", "Unknown")),
+                    disability=str(student.get("disability", "Unknown")),
                 )
                 result = predictor.predict(features.model_dump())
                 risk_level = result.get("risk_level", "low")
